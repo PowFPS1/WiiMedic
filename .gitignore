@@ -1,0 +1,17 @@
+# Build output
+build/
+*.dol
+*.elf
+*.map
+
+# Distribution
+dist/
+*.zip
+
+# Python
+__pycache__/
+*.pyc
+
+# OS
+Thumbs.db
+.DS_Store

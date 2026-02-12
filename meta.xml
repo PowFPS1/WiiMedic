@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<app version="1">
+  <name>WiiMedic</name>
+  <coder>WiiMedic Team</coder>
+  <version>1.0.0</version>
+  <release_date>20260212</release_date>
+  <short_description>System Diagnostic &amp; Health Monitor</short_description>
+  <long_description>WiiMedic is a comprehensive diagnostic and health monitoring tool for the Nintendo Wii.
+
+As Wii consoles age, hardware issues become more common. WiiMedic gives you a complete picture of your system's health in one place.
+
+FEATURES:
+- System Information: View hardware revision, firmware, region, video mode, memory stats
+- NAND Health Check: Scan NAND filesystem for usage, free space, and potential issues with visual bar graphs
+- IOS Installation Scan: Audit all installed IOS versions, detect stubs, custom IOS, and missing critical IOS
+- Storage Speed Test: Benchmark SD card and USB drive read/write speeds with performance ratings
+- Controller Diagnostics: Test GameCube controller ports and Wii Remote connections, detect stick drift
+- Network Test: Check WiFi module, IP configuration, and internet connectivity with latency measurement
+- Full Report Generator: Save a comprehensive text report to SD card that you can share online for community help
+
+Perfect for:
+- Diagnosing hardware issues on aging Wiis
+- Verifying your softmod setup is correct
+- Testing second-hand Wii consoles before buying
+- Sharing system info when asking for help on forums
+- Checking storage device compatibility and speed
+
+Navigation: Use D-Pad UP/DOWN to navigate, A to select, HOME to exit.
+  </long_description>
+</app>

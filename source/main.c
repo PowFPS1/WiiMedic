@@ -12,7 +12,6 @@
 #include <string.h>
 #include <wiiuse/wpad.h>
 
-
 #include "controller_test.h"
 #include "ios_check.h"
 #include "nand_health.h"
@@ -21,7 +20,6 @@
 #include "storage_test.h"
 #include "system_info.h"
 #include "ui_common.h"
-
 
 /* Menu configuration */
 #define MENU_ITEMS 8
@@ -169,6 +167,29 @@ int main(int argc, char **argv) {
       u32 wpad = WPAD_ButtonsDown(0);
       u32 gpad = PAD_ButtonsDown(0);
 
+      /* --- Konami code tracking (runs before navigation) --- */
+      if (wpad || gpad) {
+        bool matched = false;
+        if (wpad & konami_wpad[konami_pos])
+          matched = true;
+        else if (gpad & konami_gpad[konami_pos])
+          matched = true;
+
+        if (matched) {
+          konami_pos++;
+          if (konami_pos >= KONAMI_LEN) {
+            konami_pos = 0;
+            show_easter_egg();
+            break; /* redraw menu */
+          }
+        } else {
+          konami_pos = 0;
+          /* If they pressed the first button of the sequence, start tracking */
+          if ((wpad & konami_wpad[0]) || (gpad & konami_gpad[0]))
+            konami_pos = 1;
+        }
+      }
+
       /* Navigate up */
       if ((wpad & WPAD_BUTTON_UP) || (gpad & PAD_BUTTON_UP)) {
         selected--;
@@ -220,30 +241,6 @@ int main(int argc, char **argv) {
       if ((wpad & WPAD_BUTTON_HOME) || (gpad & PAD_BUTTON_START)) {
         running = false;
         break;
-      }
-
-      /* --- Konami code tracking --- */
-      if (wpad || gpad) {
-        bool matched = false;
-        if (wpad & konami_wpad[konami_pos])
-          matched = true;
-        else if (gpad & konami_gpad[konami_pos])
-          matched = true;
-
-        if (matched) {
-          konami_pos++;
-          if (konami_pos >= KONAMI_LEN) {
-            konami_pos = 0;
-            show_easter_egg();
-            break; /* redraw menu */
-          }
-        } else if (wpad || gpad) {
-          /* Wrong button pressed — only reset if it's not
-           * the first button of the sequence again */
-          konami_pos = 0;
-          if ((wpad & konami_wpad[0]) || (gpad & konami_gpad[0]))
-            konami_pos = 1;
-        }
       }
 
       VIDEO_WaitVSync();

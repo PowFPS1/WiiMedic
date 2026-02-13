@@ -64,17 +64,11 @@ fallback:
 #include "controller_test.h"
 #include "network_test.h"
 #include "report.h"
-#include "recommendations.h"
-#include "nand_backup.h"
-#include "history.h"
 
 /* Menu configuration */
-#define MENU_ITEMS 11
+#define MENU_ITEMS 8
 
 static const char *menu_labels[MENU_ITEMS] = {
-    "System Checkup + Recommendations",
-    "NAND Backup Safety Check",
-    "Diagnostic History / Trends",
     "System Information",
     "NAND Health Check",
     "IOS Installation Scan",
@@ -86,9 +80,6 @@ static const char *menu_labels[MENU_ITEMS] = {
 };
 
 static const char *menu_descs[MENU_ITEMS] = {
-    "Auto-detect issues and get beginner-friendly advice",
-    "Check BootMii, NAND backup, Priiloader - brick protection",
-    "View diagnostic snapshots over time, track degradation",
     "Hardware revision, firmware, region, video mode, memory",
     "Scan NAND for space usage, file counts, and health score",
     "Audit installed IOS versions, detect stubs and cIOS",
@@ -127,24 +118,15 @@ static void draw_menu(int selected) {
     ui_clear();
     ui_draw_banner();
 
-    printf(UI_BCYAN "   SMART TOOLS\n" UI_RESET);
-    printf(UI_WHITE "   -------------------\n" UI_RESET);
+    printf(UI_BCYAN "   DIAGNOSTIC MODULES\n" UI_RESET);
+    printf(UI_WHITE "   -------------------\n\n" UI_RESET);
 
-    for (i = 0; i < 3; i++) {
-        if (i == selected)
+    for (i = 0; i < MENU_ITEMS; i++) {
+        if (i == selected) {
             printf(UI_BGREEN "   >> [%d] %s\n" UI_RESET, i + 1, menu_labels[i]);
-        else
+        } else {
             printf(UI_WHITE  "      [%d] %s\n" UI_RESET, i + 1, menu_labels[i]);
-    }
-
-    printf("\n" UI_BCYAN "   DIAGNOSTIC MODULES\n" UI_RESET);
-    printf(UI_WHITE "   -------------------\n" UI_RESET);
-
-    for (i = 3; i < MENU_ITEMS; i++) {
-        if (i == selected)
-            printf(UI_BGREEN "   >> [%d] %s\n" UI_RESET, i + 1, menu_labels[i]);
-        else
-            printf(UI_WHITE  "      [%d] %s\n" UI_RESET, i + 1, menu_labels[i]);
+        }
     }
 
     printf("\n" UI_YELLOW "   %s\n" UI_RESET, menu_descs[selected]);
@@ -203,17 +185,14 @@ int main(int argc, char **argv) {
             /* Select item */
             if ((wpad & WPAD_BUTTON_A) || (gpad & PAD_BUTTON_A)) {
                 switch (selected) {
-                    case 0: run_subscreen("System Checkup",         run_recommendations);    break;
-                    case 1: run_subscreen("NAND Backup Check",      run_nand_backup_check);  break;
-                    case 2: run_subscreen("Diagnostic History",     run_history);             break;
-                    case 3: run_subscreen("System Information",     run_system_info);         break;
-                    case 4: run_subscreen("NAND Health Check",      run_nand_health);         break;
-                    case 5: run_subscreen("IOS Installation Scan",  run_ios_check);           break;
-                    case 6: run_subscreen("Storage Speed Test",     run_storage_test);        break;
-                    case 7: run_subscreen("Controller Diagnostics", run_controller_test);     break;
-                    case 8: run_subscreen("Network Connectivity",   run_network_test);        break;
-                    case 9: run_subscreen("Generate Full Report",   run_report_generator);    break;
-                    case 10: running = false; break;
+                    case 0: run_subscreen("System Information",    run_system_info);       break;
+                    case 1: run_subscreen("NAND Health Check",     run_nand_health);       break;
+                    case 2: run_subscreen("IOS Installation Scan", run_ios_check);         break;
+                    case 3: run_subscreen("Storage Speed Test",    run_storage_test);       break;
+                    case 4: run_subscreen("Controller Diagnostics",run_controller_test);    break;
+                    case 5: run_subscreen("Network Connectivity",  run_network_test);       break;
+                    case 6: run_subscreen("Generate Full Report",  run_report_generator);   break;
+                    case 7: running = false; break;
                 }
                 break;
             }

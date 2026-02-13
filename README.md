@@ -66,6 +66,15 @@ A comprehensive all-in-one diagnostic tool for the Nintendo Wii. As Wii consoles
 
 ---
 
+## Changes since v1.0.0
+- Scrollable diagnostic screens (UP/DOWN line-by-line, LEFT/RIGHT page)
+- Fixed Wii Remote detection in Controller Diagnostics and Report
+- Report detects existing reports: replace, keep both, or cancel
+- Report saves to USB if no SD card available
+- All module output routed through scroll buffer
+
+---
+
 ## Installation
 
 ### Method 1: SD Card
@@ -188,5 +197,15 @@ People frequently post on r/WiiHacks and GBAtemp asking "is my Wii broken?" or "
 
 ---
 
-*Stay healthy!* 🎮
+## Changelog
+
+### v1.1.0
+- Scrollable diagnostic screens (UP/DOWN line-by-line, LEFT/RIGHT page)
+- Fixed Wii Remote detection in Controller Diagnostics and Report
+- Report detects existing reports: replace, keep both, or cancel
+- Report saves to USB if no SD card available
+- All module output routed through scroll buffer
+
+### v1.0.0
+- Initial release with basic diagnostics and reporting functionality.
 

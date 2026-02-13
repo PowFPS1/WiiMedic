@@ -55,11 +55,11 @@ static const char *get_security_str(BSSDescriptor *bss) {
 static const char *get_signal_str(u8 level) {
   /* WD_GetRadioLevel returns a value; interpret it */
   if (level == 0)
-    return "Weak";
+    return "Weak  ";
   if (level == 1)
-    return "Fair";
+    return "Fair  ";
   if (level == 2)
-    return "Good";
+    return "Good  ";
   return "Strong";
 }
 
@@ -212,224 +212,179 @@ void run_network_test(void) {
   ui_draw_section("WiFi Card Information");
 
   /* We need to deinit the network stack first, then lock the wireless
-   * driver for direct WD access. After WD work, we release it.
-   * net_deinit() may not release the driver immediately, so we retry. */
+   * driver for direct WD access. After WD work, we release it. */
   net_deinit();
 
   {
-    s32 lockid = -1;
+    s32 lockid;
     WDInfo wdinfo;
     char mac_str[20];
     char chan_buf[128];
     bool wd_ok = false;
-    int scan_count = 0;
-    int retries;
+    u16 scan_count = 0;
 
-    /* Retry locking — the network stack may take a moment to release */
-    for (retries = 0; retries < 10; retries++) {
-      lockid = NCD_LockWirelessDriver();
-      if (lockid >= 0)
-        break;
-      /* Wait ~500ms before retrying */
-      {
-        int vsyncs;
-        for (vsyncs = 0; vsyncs < 30; vsyncs++)
-          VIDEO_WaitVSync();
-      }
-    }
 
-    if (lockid < 0) {
-      char msg[80];
-      snprintf(msg, sizeof(msg), "Could not lock WiFi driver (error %d)",
-               lockid);
-      ui_draw_err(msg);
-      rpos += snprintf(s_report + rpos, sizeof(s_report) - rpos,
-                       "WiFi Driver Lock: FAILED (error %d)\n", lockid);
-    } else {
-      /* Initialize WD in AOSSAPScan mode (mode 3) for scanning */
-      if (WD_Init(AOSSAPScan) == 0) {
-        wd_ok = true;
+    /* Initialize WD in AOSSAPScan mode (mode 3) for scanning */
+    if (WD_Init(AOSSAPScan) == 0) {
+      wd_ok = true;
+      WD_Deinit();
 
-        /* Give the hardware a moment to "warm up" after init */
+      /* --- WiFi Card Info --- */
+      memset(&wdinfo, 0, sizeof(wdinfo));
+      if (WD_GetInfo(&wdinfo) == 0) {
+        int ci, ch_pos = 0;
+
+        mac_to_str(wdinfo.MAC, mac_str);
+        ui_draw_kv("MAC Address", mac_str);
+
+        /* Firmware version (may contain trailing junk) */
+        wdinfo.version[sizeof(wdinfo.version) - 1] = '\0';
+        ui_draw_kv("Firmware", (const char *)wdinfo.version);
+
+        /* Country code */
         {
-          int vsyncs;
-          for (vsyncs = 0; vsyncs < 30; vsyncs++)
-            VIDEO_WaitVSync();
+          char cc[8];
+          snprintf(cc, sizeof(cc), "%c%c",
+                    wdinfo.CountryCode[0] ? wdinfo.CountryCode[0] : '?',
+                    wdinfo.CountryCode[1] ? wdinfo.CountryCode[1] : '?');
+          ui_draw_kv("Country Code", cc);
         }
 
-        /* --- WiFi Card Info --- */
-        memset(&wdinfo, 0, sizeof(wdinfo));
-        if (WD_GetInfo(&wdinfo) == 0) {
-          int ci, ch_pos = 0;
+        /* Current channel */
+        {
+          char ch_str[8];
+          snprintf(ch_str, sizeof(ch_str), "%d", wdinfo.channel);
+          ui_draw_kv("Current Channel", ch_str);
+        }
 
-          mac_to_str(wdinfo.MAC, mac_str);
-          ui_draw_kv("MAC Address", mac_str);
-
-          /* Firmware version (may contain trailing junk) */
-          wdinfo.version[sizeof(wdinfo.version) - 1] = '\0';
-          ui_draw_kv("Firmware", (const char *)wdinfo.version);
-
-          /* Country code */
-          {
-            char cc[8];
-            snprintf(cc, sizeof(cc), "%c%c",
-                     wdinfo.CountryCode[0] ? wdinfo.CountryCode[0] : '?',
-                     wdinfo.CountryCode[1] ? wdinfo.CountryCode[1] : '?');
-            ui_draw_kv("Country Code", cc);
-          }
-
-          /* Current channel */
-          {
-            char ch_str[8];
-            snprintf(ch_str, sizeof(ch_str), "%d", wdinfo.channel);
-            ui_draw_kv("Current Channel", ch_str);
-          }
-
-          /* Supported channels from bitmask */
-          chan_buf[0] = '\0';
-          for (ci = 1; ci <= 14; ci++) {
-            if (wdinfo.EnableChannelsMask & (1 << (ci - 1))) {
-              if (ch_pos > 0)
-                ch_pos += snprintf(chan_buf + ch_pos, sizeof(chan_buf) - ch_pos,
-                                   ", ");
+        /* Supported channels from bitmask */
+        chan_buf[0] = '\0';
+        for (ci = 1; ci <= 14; ci++) {
+          if (wdinfo.EnableChannelsMask & (1 << (ci - 1))) {
+            if (ch_pos > 0)
               ch_pos += snprintf(chan_buf + ch_pos, sizeof(chan_buf) - ch_pos,
-                                 "%d", ci);
-            }
+                                  ", ");
+            ch_pos += snprintf(chan_buf + ch_pos, sizeof(chan_buf) - ch_pos,
+                                "%d", ci);
           }
-          if (ch_pos > 0)
-            ui_draw_kv("Enabled Channels", chan_buf);
-
-          ui_draw_ok("WiFi card info retrieved");
-
-          rpos += snprintf(s_report + rpos, sizeof(s_report) - rpos,
-                           "MAC Address:         %s\n"
-                           "Firmware:            %s\n"
-                           "Current Channel:     %d\n"
-                           "Enabled Channels:    %s\n",
-                           mac_str, (const char *)wdinfo.version,
-                           wdinfo.channel, chan_buf);
-        } else {
-          ui_draw_err("Failed to read WiFi card info");
-          rpos += snprintf(s_report + rpos, sizeof(s_report) - rpos,
-                           "WiFi Card Info:      FAILED\n");
         }
+        if (ch_pos > 0)
+          ui_draw_kv("Enabled Channels", chan_buf);
 
-        /* --- WiFi AP Scan --- */
-        ui_draw_section("WiFi AP Scan");
-        ui_draw_info("Scanning for nearby access points...");
+        ui_draw_ok("WiFi card info retrieved");
 
-        {
-          static u8 scan_buf[SCAN_BUF_SIZE] ATTRIBUTE_ALIGN(32);
-          ScanParameters sparams;
-          s32 scan_ret;
+        rpos += snprintf(s_report + rpos, sizeof(s_report) - rpos,
+                          "MAC Address:         %s\n"
+                          "Firmware:            %s\n"
+                          "Current Channel:     %d\n"
+                          "Enabled Channels:    %s\n",
+                          mac_str, (const char *)wdinfo.version,
+                          wdinfo.channel, chan_buf);
+      } else {
+        ui_draw_err("Failed to read WiFi card info");
+        rpos += snprintf(s_report + rpos, sizeof(s_report) - rpos,
+                          "WiFi Card Info:      FAILED\n");
+      }
 
-          WD_SetDefaultScanParameters(&sparams);
-          /* Be more thorough for real hardware */
-          sparams.MaxChannelTime = 250;
-          memset(scan_buf, 0, sizeof(scan_buf));
+      /* --- WiFi AP Scan --- */
+      ui_draw_section("WiFi AP Scan");
+      ui_draw_info("Scanning for nearby access points...");
 
-          /* Perform scan twice if first one returns nothing - hardware can be
-           * flaky */
-          scan_ret = WD_ScanOnce(&sparams, scan_buf, sizeof(scan_buf));
-          if (scan_ret >= 0 && scan_buf[0] == 0) {
-            scan_ret = WD_ScanOnce(&sparams, scan_buf, sizeof(scan_buf));
-          }
+      {
+        static u8 scan_buf[SCAN_BUF_SIZE] ATTRIBUTE_ALIGN(32);
+        ScanParameters sparams;
+        s32 scan_ret;
 
-          if (scan_ret >= 0) {
-            /* Parse BSSDescriptor entries from the buffer */
-            u8 *ptr = scan_buf;
-            u8 *end = scan_buf + sizeof(scan_buf);
+        WD_SetDefaultScanParameters(&sparams);
+        memset(scan_buf, 0, sizeof(scan_buf));
 
-            scan_count = 0;
+        scan_ret = WD_ScanOnce(&sparams, scan_buf, sizeof(scan_buf));
+
+        if (scan_ret >= 0) {
+          /* Parse BSSDescriptor entries from the buffer */
+          u8 *ptr = scan_buf;
+          u8 *end = scan_buf + sizeof(scan_buf);
+
+          scan_count = ptr[0] << 8 | ptr[1];;
+
+          ptr += 2;
+
+          rpos += snprintf(s_report + rpos, sizeof(s_report) - rpos,
+                            "\n--- Nearby Access Points ---\n");
+
+          for(u8 i = 0; ptr < end && i < scan_count; i++) {
+            BSSDescriptor *bss = (BSSDescriptor *)ptr;
+            char ssid[33];
+            char bssid_str[20];
+            char line[128];
+            u8 signal;
+            u16 entry_len;
+
+            /* Extract SSID */
+            memset(ssid, 0, sizeof(ssid));
+            if (bss->SSIDLength > 0 && bss->SSIDLength <= 32)
+              memcpy(ssid, bss->SSID, bss->SSIDLength);
+            else
+              strcpy(ssid, "(Hidden)");
+
+            mac_to_str(bss->BSSID, bssid_str);
+            signal = WD_GetRadioLevel(bss);
+
+            snprintf(line, sizeof(line), "%-24s Ch:%-2d  Sig:%s  %s", ssid,
+                      bss->channel, get_signal_str(signal),
+                      get_security_str(bss));
+
+            /* Color based on signal */
+            if (signal >= 2)
+              ui_draw_ok(line);
+            else if (signal == 1)
+              ui_draw_warn(line);
+            else
+              ui_draw_err(line);
 
             rpos += snprintf(s_report + rpos, sizeof(s_report) - rpos,
-                             "\n--- Nearby Access Points ---\n");
+                              "  %s  BSSID:%s  Ch:%d  Signal:%s  %s\n", ssid,
+                              bssid_str, bss->channel, get_signal_str(signal),
+                              get_security_str(bss));
 
-            while (ptr < (end - sizeof(BSSDescriptor)) &&
-                   scan_count < MAX_SCAN_APS) {
-              BSSDescriptor *bss = (BSSDescriptor *)ptr;
-              char ssid[33];
-              char bssid_str[20];
-              char line[128];
-              u8 signal;
-              u16 entry_len;
-
-              /* Validate entry length and SSID length to ignore junk/empty
-               * buffer entries */
-              if (bss->length == 0 || bss->length < sizeof(BSSDescriptor) ||
-                  bss->SSIDLength > 32)
-                break;
-
-              /* Sanity check: BSSID shouldn't be all zero if it's a real result
-               */
-              if (bss->BSSID[0] == 0 && bss->BSSID[1] == 0 &&
-                  bss->BSSID[2] == 0 && bss->BSSID[3] == 0 &&
-                  bss->BSSID[4] == 0 && bss->BSSID[5] == 0) {
-                ptr += bss->length;
-                continue;
-              }
-
-              entry_len = bss->length;
-
-              /* Extract SSID */
-              memset(ssid, 0, sizeof(ssid));
-              if (bss->SSIDLength > 0)
-                memcpy(ssid, bss->SSID, bss->SSIDLength);
-              else
-                strcpy(ssid, "(Hidden)");
-
-              mac_to_str(bss->BSSID, bssid_str);
-              signal = WD_GetRadioLevel(bss);
-
-              snprintf(line, sizeof(line), "%-24s Ch:%-2d  Sig:%s  %s", ssid,
-                       bss->channel, get_signal_str(signal),
-                       get_security_str(bss));
-
-              /* Color based on signal */
-              if (signal >= 2)
-                ui_draw_ok(line);
-              else if (signal == 1)
-                ui_draw_warn(line);
-              else
-                ui_draw_err(line);
-
-              rpos += snprintf(s_report + rpos, sizeof(s_report) - rpos,
-                               "  %s  BSSID:%s  Ch:%d  Signal:%s  %s\n", ssid,
-                               bssid_str, bss->channel, get_signal_str(signal),
-                               get_security_str(bss));
-
-              scan_count++;
-              ptr += entry_len;
+            // Sometimes length can be 0, which is wrong.
+            // And in that case we can use ptr->IEs_length to get the correct length. 
+            if (bss->length == 0) {
+                if((bss->IEs_length + 0x3E) % 2 == 0) {
+                    entry_len = bss->IEs_length + 0x3E;
+                } else {
+                    entry_len = bss->IEs_length + 0x3F;
+                }            
+            } else { // If it's not then we just use it as it is.
+                // Doubling bss->length seems to match the BSSDescriptor length + IEs_length.
+                entry_len = bss->length * 2;
             }
-
-            if (scan_count == 0) {
-              ui_draw_warn("No access points found");
-              rpos += snprintf(s_report + rpos, sizeof(s_report) - rpos,
-                               "  (none found)\n");
-            } else {
-              char cnt[64];
-              snprintf(cnt, sizeof(cnt), "Found %d access point(s)",
-                       scan_count);
-              ui_draw_ok(cnt);
-            }
-          } else {
-            char msg[80];
-            snprintf(msg, sizeof(msg), "AP scan failed (error %d)", scan_ret);
-            ui_draw_err(msg);
-            rpos +=
-                snprintf(s_report + rpos, sizeof(s_report) - rpos,
-                         "AP Scan:             FAILED (error %d)\n", scan_ret);
+            ptr += entry_len;
           }
+
+          if (scan_count == 0) {
+            ui_draw_warn("No access points found");
+            rpos += snprintf(s_report + rpos, sizeof(s_report) - rpos,
+                              "  (none found)\n");
+          } else {
+            char cnt[64];
+            snprintf(cnt, sizeof(cnt), "Found %d access point(s)",
+                      scan_count);
+            ui_draw_ok(cnt);
+          }
+        } else {
+          char msg[80];
+          snprintf(msg, sizeof(msg), "AP scan failed (error %d)", scan_ret);
+          ui_draw_err(msg);
+          rpos +=
+              snprintf(s_report + rpos, sizeof(s_report) - rpos,
+                        "AP Scan:             FAILED (error %d)\n", scan_ret);
         }
-
-        WD_Deinit();
-      } else {
-        ui_draw_err("Failed to initialize WiFi driver (WD_Init)");
-        rpos += snprintf(s_report + rpos, sizeof(s_report) - rpos,
-                         "WiFi Driver Init:    FAILED\n");
       }
-
-      NCD_UnlockWirelessDriver(lockid);
+    } else {
+      ui_draw_err("Failed to initialize WiFi driver (WD_Init)");
+      rpos += snprintf(s_report + rpos, sizeof(s_report) - rpos,
+                        "WiFi Driver Init:    FAILED\n");
     }
   }
 

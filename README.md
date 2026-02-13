@@ -1,5 +1,6 @@
-<img width="128" height="48" alt="image" src="https://github.com/user-attachments/assets/6937a77d-bce6-4666-9780-0feb9afc5b78" />
-
+<div align="center">
+  <img width="128" height="48" alt="WiiMedic" src="https://github.com/user-attachments/assets/6937a77d-bce6-4666-9780-0feb9afc5b78" />
+</div>
 
 # WiiMedic - Wii System Diagnostic & Health Monitor
 

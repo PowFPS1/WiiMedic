@@ -1,3 +1,6 @@
+<img width="128" height="48" alt="image" src="https://github.com/user-attachments/assets/6937a77d-bce6-4666-9780-0feb9afc5b78" />
+
+
 # WiiMedic - Wii System Diagnostic & Health Monitor
 
 **Version 1.0.0** | Wii Homebrew Application
@@ -173,12 +176,6 @@ As of 2026, the Nintendo Wii is 20 years old. The homebrew community is thriving
 - **Softmod confusion** - Users can't easily verify their setup is correct
 
 People frequently post on r/WiiHacks and GBAtemp asking "is my Wii broken?" or "why isn't this working?" WiiMedic gives them (and you) a quick, comprehensive answer.
-
----
-
-## License
-
-This project is licensed under the GNU General Public License v2 (GPLv2).
 
 ---
 

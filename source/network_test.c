@@ -213,18 +213,31 @@ void run_network_test(void) {
   ui_draw_section("WiFi Card Information");
 
   /* We need to deinit the network stack first, then lock the wireless
-   * driver for direct WD access. After WD work, we release it. */
+   * driver for direct WD access. After WD work, we release it.
+   * net_deinit() may not release the driver immediately, so we retry. */
   net_deinit();
 
   {
-    s32 lockid;
+    s32 lockid = -1;
     WDInfo wdinfo;
     char mac_str[20];
     char chan_buf[128];
     bool wd_ok = false;
     int scan_count = 0;
+    int retries;
 
-    lockid = NCD_LockWirelessDriver();
+    /* Retry locking — the network stack may take a moment to release */
+    for (retries = 0; retries < 10; retries++) {
+      lockid = NCD_LockWirelessDriver();
+      if (lockid >= 0) break;
+      /* Wait ~500ms before retrying */
+      {
+        int vsyncs;
+        for (vsyncs = 0; vsyncs < 30; vsyncs++)
+          VIDEO_WaitVSync();
+      }
+    }
+
     if (lockid < 0) {
       char msg[80];
       snprintf(msg, sizeof(msg), "Could not lock WiFi driver (error %d)",

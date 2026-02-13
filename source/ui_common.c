@@ -196,43 +196,50 @@ void ui_scroll_view(const char *title) {
     max_offset = s_scroll_count - visible;
     if (max_offset < 0) max_offset = 0;
 
+    /* Initial full clear */
+    printf("\x1b[2J\x1b[0;0H");
+
     while (1) {
         int i, end;
         u32 wpad, gpad;
         bool redraw;
 
-        printf("\x1b[2J\x1b[0;0H");
+        /* Reposition cursor to top-left (no clear) */
+        printf("\x1b[0;0H");
 
         /* Compact header */
         printf(UI_BGREEN " [+] WiiMedic" UI_RESET " " UI_CYAN "v"
-               WIIMEDIC_VERSION UI_RESET "  " UI_BWHITE "%s\n" UI_RESET,
+               WIIMEDIC_VERSION UI_RESET "  " UI_BWHITE "%s" UI_RESET
+               "\x1b[K\n",
                title);
         printf(UI_WHITE " ");
         for (i = 0; i < 58; i++) printf("-");
-        printf("\n" UI_RESET);
+        printf("\x1b[K\n" UI_RESET);
 
         /* Content lines */
         end = offset + visible;
         if (end > s_scroll_count) end = s_scroll_count;
         for (i = offset; i < end; i++) {
-            printf(UI_RESET "%s\n", s_scroll_lines[i]);
+            printf(UI_RESET "%s\x1b[K\n", s_scroll_lines[i]);
         }
         /* Pad so footer stays at bottom */
-        for (i = end - offset; i < visible; i++) printf("\n");
+        for (i = end - offset; i < visible; i++) printf("\x1b[K\n");
 
         /* Footer */
         printf(UI_WHITE " ");
         for (i = 0; i < 58; i++) printf("-");
-        printf("\n" UI_RESET);
+        printf("\x1b[K\n" UI_RESET);
         if (max_offset > 0) {
             printf(UI_WHITE " [UP/DOWN] Scroll  [LEFT/RIGHT] Page  "
                    "[A/B] Return" UI_RESET
-                   UI_CYAN "  [%d-%d/%d]\n" UI_RESET,
+                   UI_CYAN "  [%d-%d/%d]" UI_RESET "\x1b[K\n",
                    offset + 1, end, s_scroll_count);
         } else {
             printf(UI_WHITE
-                   " Press [A] or [B] to return to menu...\n" UI_RESET);
+                   " Press [A] or [B] to return to menu...\x1b[K\n" UI_RESET);
         }
+
+        VIDEO_WaitVSync();
 
         /* Input loop */
         while (1) {

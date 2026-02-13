@@ -100,6 +100,7 @@ static void run_subscreen(const char *title, void (*func)(void)) {
 int main(int argc, char **argv) {
   int selected = 0;
   bool running = true;
+  bool exit_to_hbc = false;
 
   /* Initialize subsystems */
   init_video();
@@ -159,6 +160,7 @@ int main(int argc, char **argv) {
           run_subscreen("Generate Full Report", run_report_generator);
           break;
         case 7:
+          exit_to_hbc = true;
           running = false;
           break;
         }
@@ -179,6 +181,11 @@ int main(int argc, char **argv) {
   ui_clear();
   printf(UI_BGREEN "\n  WiiMedic shutting down. Stay healthy!\n\n" UI_RESET);
   WPAD_Shutdown();
-  WII_LaunchTitle(0x0001000148415858ULL); // HBC title ID for HAXX
+
+  if (exit_to_hbc) {
+    WII_LaunchTitle(0x0001000148415858ULL); // HBC title ID for HAXX
+  } else {
+    SYS_ResetSystem(SYS_RETURNTOMENU, 0, 0);
+  }
   return 0;
 }

@@ -189,14 +189,6 @@ People frequently post on r/WiiHacks and GBAtemp asking "is my Wii broken?" or "
 
 ---
 
-## Credits
-
-- Built with [devkitPro](https://devkitpro.org/) / [libogc](https://github.com/devkitPro/libogc)
-- Inspired by the Wii homebrew community's need for better diagnostic tools
-- Thanks to the r/WiiHacks and GBAtemp communities
-
----
-
 ## Changelog
 
 ### v1.1.0
@@ -209,3 +201,10 @@ People frequently post on r/WiiHacks and GBAtemp asking "is my Wii broken?" or "
 ### v1.0.0
 - Initial release with basic diagnostics and reporting functionality.
 
+---
+
+## Credits
+
+- Built with [devkitPro](https://devkitpro.org/) / [libogc](https://github.com/devkitPro/libogc)
+- Inspired by the Wii homebrew community's need for better diagnostic tools
+- Thanks to the r/WiiHacks and GBAtemp communities

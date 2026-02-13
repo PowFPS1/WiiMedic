@@ -216,7 +216,6 @@ void run_network_test(void) {
   net_deinit();
 
   {
-    s32 lockid;
     WDInfo wdinfo;
     char mac_str[20];
     char chan_buf[128];

@@ -18,6 +18,7 @@ A comprehensive all-in-one diagnostic tool for the Nintendo Wii. As Wii consoles
 - Device ID and Boot2 version (with BootMii compatibility warning)
 - Memory arena status (MEM1/MEM2)
 - Display settings (aspect ratio, progressive scan)
+- **Brick Protection Check** — detects Priiloader, BootMii (boot2), and BootMii (IOS) with overall protection rating
 
 ### 2. NAND Health Check
 - Scans NAND filesystem cluster and inode usage

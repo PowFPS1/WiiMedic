@@ -13,7 +13,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-
 #include "network_test.h"
 #include "ui_common.h"
 
@@ -229,7 +228,8 @@ void run_network_test(void) {
     /* Retry locking — the network stack may take a moment to release */
     for (retries = 0; retries < 10; retries++) {
       lockid = NCD_LockWirelessDriver();
-      if (lockid >= 0) break;
+      if (lockid >= 0)
+        break;
       /* Wait ~500ms before retrying */
       {
         int vsyncs;
@@ -249,6 +249,13 @@ void run_network_test(void) {
       /* Initialize WD in AOSSAPScan mode (mode 3) for scanning */
       if (WD_Init(AOSSAPScan) == 0) {
         wd_ok = true;
+
+        /* Give the hardware a moment to "warm up" after init */
+        {
+          int vsyncs;
+          for (vsyncs = 0; vsyncs < 30; vsyncs++)
+            VIDEO_WaitVSync();
+        }
 
         /* --- WiFi Card Info --- */
         memset(&wdinfo, 0, sizeof(wdinfo));
@@ -317,9 +324,16 @@ void run_network_test(void) {
           s32 scan_ret;
 
           WD_SetDefaultScanParameters(&sparams);
+          /* Be more thorough for real hardware */
+          sparams.MaxChannelTime = 250;
           memset(scan_buf, 0, sizeof(scan_buf));
 
+          /* Perform scan twice if first one returns nothing - hardware can be
+           * flaky */
           scan_ret = WD_ScanOnce(&sparams, scan_buf, sizeof(scan_buf));
+          if (scan_ret >= 0 && scan_buf[0] == 0) {
+            scan_ret = WD_ScanOnce(&sparams, scan_buf, sizeof(scan_buf));
+          }
 
           if (scan_ret >= 0) {
             /* Parse BSSDescriptor entries from the buffer */
@@ -331,7 +345,8 @@ void run_network_test(void) {
             rpos += snprintf(s_report + rpos, sizeof(s_report) - rpos,
                              "\n--- Nearby Access Points ---\n");
 
-            while (ptr < end && scan_count < MAX_SCAN_APS) {
+            while (ptr < (end - sizeof(BSSDescriptor)) &&
+                   scan_count < MAX_SCAN_APS) {
               BSSDescriptor *bss = (BSSDescriptor *)ptr;
               char ssid[33];
               char bssid_str[20];
@@ -339,15 +354,26 @@ void run_network_test(void) {
               u8 signal;
               u16 entry_len;
 
-              /* Validate entry */
-              if (bss->length == 0 || bss->length < sizeof(BSSDescriptor))
+              /* Validate entry length and SSID length to ignore junk/empty
+               * buffer entries */
+              if (bss->length == 0 || bss->length < sizeof(BSSDescriptor) ||
+                  bss->SSIDLength > 32)
                 break;
+
+              /* Sanity check: BSSID shouldn't be all zero if it's a real result
+               */
+              if (bss->BSSID[0] == 0 && bss->BSSID[1] == 0 &&
+                  bss->BSSID[2] == 0 && bss->BSSID[3] == 0 &&
+                  bss->BSSID[4] == 0 && bss->BSSID[5] == 0) {
+                ptr += bss->length;
+                continue;
+              }
 
               entry_len = bss->length;
 
               /* Extract SSID */
               memset(ssid, 0, sizeof(ssid));
-              if (bss->SSIDLength > 0 && bss->SSIDLength <= 32)
+              if (bss->SSIDLength > 0)
                 memcpy(ssid, bss->SSID, bss->SSIDLength);
               else
                 strcpy(ssid, "(Hidden)");

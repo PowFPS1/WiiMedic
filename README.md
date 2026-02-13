@@ -35,7 +35,7 @@ SD:/apps/WiiMedic/meta.xml
 SD:/apps/WiiMedic/icon.png
 ```
 
-Then just launch it from the Homebrew Channel. USB goes in the bottom port.
+Then just launch it from the Homebrew Channel.
 
 ---
 

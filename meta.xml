@@ -2,7 +2,7 @@
 <app version="1">
   <name>WiiMedic</name>
   <coder>WiiMedic Team</coder>
-  <version>1.2.0</version>
+  <version>1.0.0</version>
   <release_date>20260212</release_date>
   <short_description>System Diagnostic &amp; Health Monitor</short_description>
   <long_description>WiiMedic is a comprehensive diagnostic and health monitoring tool for the Nintendo Wii.
@@ -10,19 +10,13 @@
 As Wii consoles age, hardware issues become more common. WiiMedic gives you a complete picture of your system's health in one place.
 
 FEATURES:
-NEW IN v1.2.0:
-- System Checkup + Recommendations: Auto-detects issues and gives beginner-friendly advice with severity levels
-- NAND Backup Safety Check: Verifies BootMii, NAND backup, keys.bin, Priiloader with a Safety Score
-- Diagnostic History: Saves snapshots over time, tracks NAND degradation and IOS changes
-
-DIAGNOSTIC MODULES:
-- System Information: Hardware revision, firmware, region, video mode, memory stats
-- NAND Health Check: Scan NAND for space usage, file counts, and health score
-- IOS Installation Scan: Audit all installed IOS versions, detect stubs and cIOS
-- Storage Speed Test: Benchmark SD/USB read and write speeds with ratings
-- Controller Diagnostics: Test GC controllers and Wii Remotes, detect stick drift
-- Network Test: Check WiFi, IP config, internet connectivity with latency
-- Full Report Generator: Save comprehensive diagnostic report to SD/USB
+- System Information: View hardware revision, firmware, region, video mode, memory stats
+- NAND Health Check: Scan NAND filesystem for usage, free space, and potential issues with visual bar graphs
+- IOS Installation Scan: Audit all installed IOS versions, detect stubs, custom IOS, and missing critical IOS
+- Storage Speed Test: Benchmark SD card and USB drive read/write speeds with performance ratings
+- Controller Diagnostics: Test GameCube controller ports and Wii Remote connections, detect stick drift
+- Network Test: Check WiFi module, IP configuration, and internet connectivity with latency measurement
+- Full Report Generator: Save a comprehensive text report to SD card that you can share online for community help
 
 Perfect for:
 - Diagnosing hardware issues on aging Wiis

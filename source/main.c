@@ -43,18 +43,6 @@ static const char *menu_descs[MENU_ITEMS] = {
 static void *xfb = NULL;
 static GXRModeObj *rmode = NULL;
 
-/* Konami code: UP UP DOWN DOWN LEFT RIGHT LEFT RIGHT B A */
-#define KONAMI_LEN 10
-static const u32 konami_wpad[KONAMI_LEN] = {
-    WPAD_BUTTON_UP,   WPAD_BUTTON_UP,    WPAD_BUTTON_DOWN, WPAD_BUTTON_DOWN,
-    WPAD_BUTTON_LEFT, WPAD_BUTTON_RIGHT, WPAD_BUTTON_LEFT, WPAD_BUTTON_RIGHT,
-    WPAD_BUTTON_B,    WPAD_BUTTON_A};
-static const u32 konami_gpad[KONAMI_LEN] = {
-    PAD_BUTTON_UP,   PAD_BUTTON_UP,    PAD_BUTTON_DOWN, PAD_BUTTON_DOWN,
-    PAD_BUTTON_LEFT, PAD_BUTTON_RIGHT, PAD_BUTTON_LEFT, PAD_BUTTON_RIGHT,
-    PAD_BUTTON_B,    PAD_BUTTON_A};
-static int konami_pos = 0;
-
 /*---------------------------------------------------------------------------*/
 static void init_video(void) {
   VIDEO_Init();
@@ -97,42 +85,6 @@ static void draw_menu(int selected) {
 }
 
 /*---------------------------------------------------------------------------*/
-static void show_easter_egg(void) {
-  int i;
-
-  ui_clear();
-  printf("\n\n");
-  printf(UI_BGREEN "         ___________________________________\n");
-  printf("        |       ____                        |\n");
-  printf("        |      |    \\ _ __                  |\n");
-  printf("        |      |  D  | '__| __      _  _    |\n");
-  printf("        |      |  D  | |   /  \\   / \\/ \\   |\n");
-  printf("        |      |  D  | |  | () |  | |/| |   |\n");
-  printf("        |      |____/|_|   \\__/\\_ |_|  |_|   |\n");
-  printf("        |                                    |\n");
-  printf("        |   DIAGNOSIS: Your Wii is AWESOME   |\n");
-  printf("        |___________________________________|\n" UI_RESET);
-  printf("\n");
-  printf(UI_BCYAN "          Rx: Keep playing games daily.\n" UI_RESET);
-  printf(UI_BYELLOW "          Side effects may include: fun.\n\n" UI_RESET);
-  printf(UI_WHITE "               - Dr. Wii, M.D. -\n\n" UI_RESET);
-  printf(UI_MAGENTA "          You found the secret! :)\n" UI_RESET);
-  printf("\n");
-  printf(UI_WHITE "         Returning in " UI_RESET);
-
-  for (i = 3; i > 0; i--) {
-    printf(UI_BGREEN "%d..." UI_RESET, i);
-    VIDEO_WaitVSync();
-    /* ~1 second delay using vsync (approx 60 vsyncs) */
-    {
-      int v;
-      for (v = 0; v < 60; v++)
-        VIDEO_WaitVSync();
-    }
-  }
-}
-
-/*---------------------------------------------------------------------------*/
 static void run_subscreen(const char *title, void (*func)(void)) {
   ui_clear();
   ui_draw_banner();
@@ -148,7 +100,6 @@ static void run_subscreen(const char *title, void (*func)(void)) {
 int main(int argc, char **argv) {
   int selected = 0;
   bool running = true;
-  konami_pos = 0;
 
   /* Initialize subsystems */
   init_video();
@@ -166,29 +117,6 @@ int main(int argc, char **argv) {
 
       u32 wpad = WPAD_ButtonsDown(0);
       u32 gpad = PAD_ButtonsDown(0);
-
-      /* --- Konami code tracking (runs before navigation) --- */
-      if (wpad || gpad) {
-        bool matched = false;
-        if (wpad & konami_wpad[konami_pos])
-          matched = true;
-        else if (gpad & konami_gpad[konami_pos])
-          matched = true;
-
-        if (matched) {
-          konami_pos++;
-          if (konami_pos >= KONAMI_LEN) {
-            konami_pos = 0;
-            show_easter_egg();
-            break; /* redraw menu */
-          }
-        } else {
-          konami_pos = 0;
-          /* If they pressed the first button of the sequence, start tracking */
-          if ((wpad & konami_wpad[0]) || (gpad & konami_gpad[0]))
-            konami_pos = 1;
-        }
-      }
 
       /* Navigate up */
       if ((wpad & WPAD_BUTTON_UP) || (gpad & PAD_BUTTON_UP)) {

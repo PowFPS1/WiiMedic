@@ -57,6 +57,8 @@ A comprehensive all-in-one diagnostic tool for the Nintendo Wii. As Wii consoles
 - DHCP validation
 - TCP connectivity tests to known servers
 - Internet connectivity rating (Full/Partial/None)
+- **WiFi Card Info** — MAC address, firmware version, country code, supported channels
+- **WiFi AP Scanner** — Scans for nearby access points showing SSID, signal strength, channel, and security type
 - Tips for Wiimmfi and WiiLink connectivity
 
 ### 7. Full Report Generator
@@ -67,6 +69,8 @@ A comprehensive all-in-one diagnostic tool for the Nintendo Wii. As Wii consoles
 ---
 
 ## Changes since v1.0.0
+- WiFi Card Info: displays MAC address, firmware, country code, and enabled channels (requires libogc 3.0.0+)
+- WiFi AP Scanner: scans nearby access points with SSID, signal strength, channel, and security info
 - Scrollable diagnostic screens (UP/DOWN line-by-line, LEFT/RIGHT page)
 - Fixed Wii Remote detection in Controller Diagnostics and Report
 - Report detects existing reports: replace, keep both, or cancel
@@ -105,7 +109,7 @@ A comprehensive all-in-one diagnostic tool for the Nintendo Wii. As Wii consoles
 
 ### Prerequisites
 - [devkitPro](https://devkitpro.org/) with devkitPPC
-- libogc (included with devkitPro)
+- libogc 3.0.0+ (included with devkitPro; required for WiFi scanning features)
 - libfat (included with devkitPro)
 
 ### Build Steps
@@ -192,6 +196,8 @@ People frequently post on r/WiiHacks and GBAtemp asking "is my Wii broken?" or "
 ## Changelog
 
 ### v1.1.0
+- WiFi Card Info: MAC address, firmware version, country code, enabled channels
+- WiFi AP Scanner: scans nearby access points (SSID, signal, channel, security)
 - Scrollable diagnostic screens (UP/DOWN line-by-line, LEFT/RIGHT page)
 - Fixed Wii Remote detection in Controller Diagnostics and Report
 - Report detects existing reports: replace, keep both, or cancel

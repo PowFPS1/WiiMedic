@@ -179,12 +179,6 @@ People frequently post on r/WiiHacks and GBAtemp asking "is my Wii broken?" or "
 
 ---
 
-## License
-
-This project is licensed under the GNU General Public License v2 (GPLv2).
-
----
-
 ## Credits
 
 - Built with [devkitPro](https://devkitpro.org/) / [libogc](https://github.com/devkitPro/libogc)

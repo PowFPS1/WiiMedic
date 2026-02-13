@@ -167,6 +167,6 @@ int main(int argc, char **argv) {
     ui_clear();
     printf(UI_BGREEN "\n  WiiMedic shutting down. Stay healthy!\n\n" UI_RESET);
     WPAD_Shutdown();
-    SYS_ResetSystem(SYS_RETURNTOMENU, 0, 0);
+    WII_LaunchTitle(0x0001000148415858ULL); // HBC title ID for HAXX
     return 0;
 }

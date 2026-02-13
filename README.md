@@ -4,7 +4,7 @@
 
 # WiiMedic - Wii System Diagnostic & Health Monitor
 
-**Version 1.0.0** | Wii Homebrew Application
+**Version 1.1.0** | Wii Homebrew Application
 
 A comprehensive all-in-one diagnostic tool for the Nintendo Wii. As Wii consoles age (now 20 years old!), hardware issues become increasingly common. WiiMedic gives you a complete picture of your system's health and generates shareable reports for community troubleshooting.
 
@@ -189,3 +189,4 @@ People frequently post on r/WiiHacks and GBAtemp asking "is my Wii broken?" or "
 ---
 
 *Stay healthy!* 🎮
+

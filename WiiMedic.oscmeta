@@ -7,8 +7,7 @@
             "Wii Remote",
             "GameCube Controller"
         ],
-        "version": "auto",
-        "release_date": "2026-02-12"
+        "version": "auto"
     },
     "source": {
         "type": "github_release",
@@ -18,8 +17,7 @@
     },
     "treatments": [
         {
-            "treatment": "contents.move",
-            "arguments": ["apps/WiiMedic/", "apps/WiiMedic/"]
+            "treatment": "meta.remove_declaration"
         }
     ]
 }

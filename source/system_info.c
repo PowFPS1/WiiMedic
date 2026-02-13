@@ -125,7 +125,7 @@ void run_system_info(void) {
     ui_draw_kv("GPU",       "Hollywood (ATI/AMD)");
     ui_draw_kv("GPU Clock", "243 MHz (fixed)");
 
-    printf("\n");
+    ui_printf("\n");
     ui_draw_ok("System information collected successfully");
 }
 

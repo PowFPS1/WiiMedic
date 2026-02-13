@@ -108,7 +108,7 @@ static void run_benchmark(const char *device_name, const char *base_path) {
         buffer[i] = (u8)(i & 0xFF);
 
     /* Write speed */
-    printf("   " UI_WHITE "Running write speed test...\n" UI_RESET);
+    ui_printf("   " UI_WHITE "Running write speed test...\n" UI_RESET);
 
     for (iter = 0; iter < TEST_ITERATIONS; iter++) {
         FILE *fp = fopen(testpath, "wb");
@@ -136,7 +136,7 @@ static void run_benchmark(const char *device_name, const char *base_path) {
     }
 
     /* Read speed */
-    printf("   " UI_WHITE "Running read speed test...\n" UI_RESET);
+    ui_printf("   " UI_WHITE "Running read speed test...\n" UI_RESET);
 
     for (iter = 0; iter < TEST_ITERATIONS; iter++) {
         FILE *fp = fopen(testpath, "rb");
@@ -166,7 +166,7 @@ static void run_benchmark(const char *device_name, const char *base_path) {
     read_color  = (read_speed_kbs > SPEED_GOOD_KB) ? UI_BGREEN :
                   (read_speed_kbs > SPEED_OK_KB) ? UI_BYELLOW : UI_BRED;
 
-    printf("\n");
+    ui_printf("\n");
     snprintf(buf, sizeof(buf), "%.1f KB/s (%.2f MB/s)",
              write_speed_kbs, write_speed_kbs / 1024.0f);
     ui_draw_kv_color("Write Speed", write_color, buf);
@@ -226,7 +226,7 @@ void run_storage_test(void) {
         rpos += snprintf(s_report + rpos, sizeof(s_report) - rpos,
             "USB Storage: Detected, benchmark completed\n");
     } else {
-        printf("   " UI_WHITE "USB not detected (normal if none is connected)\n" UI_RESET);
+        ui_printf("   " UI_WHITE "USB not detected (normal if none is connected)\n" UI_RESET);
         ui_draw_info("USB must be in the port closest to the edge");
         rpos += snprintf(s_report + rpos, sizeof(s_report) - rpos,
             "USB Storage: Not detected\n");
@@ -241,7 +241,7 @@ void run_storage_test(void) {
 
     rpos += snprintf(s_report + rpos, sizeof(s_report) - rpos, "\n");
 
-    printf("\n");
+    ui_printf("\n");
     ui_draw_ok("Storage test complete");
 }
 

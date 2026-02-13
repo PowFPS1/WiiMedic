@@ -63,6 +63,15 @@ void ui_draw_info(const char *msg);
 /* Draw footer with navigation hint (NULL = default nav text) */
 void ui_draw_footer(const char *msg);
 
+/* Print that routes through scroll buffer when active */
+int ui_printf(const char *fmt, ...);
+
+/* Start capturing output to scroll buffer */
+void ui_scroll_begin(void);
+
+/* Display scroll viewer with UP/DOWN/LEFT/RIGHT navigation */
+void ui_scroll_view(const char *title);
+
 /* Wait for A or B button press */
 void ui_wait_button(void);
 

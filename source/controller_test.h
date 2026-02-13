@@ -8,6 +8,9 @@
 // Run the controller diagnostic test
 void run_controller_test(void);
 
+// Quick scan - just count connected controllers (no UI output)
+void scan_controllers_quick(void);
+
 // Get controller test report as string
 void get_controller_test_report(char *buf, int bufsize);
 

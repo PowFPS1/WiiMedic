@@ -10,6 +10,7 @@
 #include <time.h>
 #include <gccore.h>
 #include <fat.h>
+#include <wiiuse/wpad.h>
 #include <ogc/lwp_watchdog.h>
 
 #include "report.h"
@@ -22,7 +23,105 @@
 #include "network_test.h"
 
 #define REPORT_MAX_SIZE  32768
-#define REPORT_PATH      "sd:/WiiMedic_Report.txt"
+#define REPORT_PATH_SD   "sd:/WiiMedic_Report.txt"
+#define REPORT_PATH_USB  "usb:/WiiMedic_Report.txt"
+
+/*---------------------------------------------------------------------------*/
+/* Check if a report file exists at the given path, return its size or -1 */
+static long check_existing_report(const char *path) {
+    FILE *f = fopen(path, "r");
+    long size;
+    if (!f) return -1;
+    fseek(f, 0, SEEK_END);
+    size = ftell(f);
+    fclose(f);
+    return size;
+}
+
+/*---------------------------------------------------------------------------*/
+/* Find the next available numbered filename like WiiMedic_Report_2.txt */
+static void find_next_filename(const char *base_dir, char *out, int outsize) {
+    int num;
+    for (num = 2; num <= 99; num++) {
+        FILE *f;
+        snprintf(out, outsize, "%s/WiiMedic_Report_%d.txt", base_dir, num);
+        f = fopen(out, "r");
+        if (!f) return;  /* This name is free */
+        fclose(f);
+    }
+    /* Fallback: overwrite #99 */
+    snprintf(out, outsize, "%s/WiiMedic_Report_99.txt", base_dir);
+}
+
+/*---------------------------------------------------------------------------*/
+/* Ask user what to do with existing report. Returns:
+   0 = replace, 1 = keep both, 2 = cancel */
+static int ask_existing_report_action(const char *path, long size) {
+    int selected = 0;
+    char buf[128];
+
+    while (1) {
+        u32 wpad, gpad;
+
+        printf("\x1b[2J\x1b[0;0H");
+        printf(UI_BGREEN " [+] WiiMedic" UI_RESET " " UI_CYAN "v"
+               WIIMEDIC_VERSION UI_RESET "\n");
+        printf(UI_WHITE " ----------------------------------------------------------\n" UI_RESET);
+
+        printf("\n" UI_BYELLOW "   Existing report found!\n\n" UI_RESET);
+
+        snprintf(buf, sizeof(buf), "%.1f KB", (float)size / 1024.0f);
+        printf("   " UI_CYAN "File " UI_RESET "......... " UI_BWHITE "%s\n" UI_RESET, path);
+        printf("   " UI_CYAN "Size " UI_RESET "......... " UI_BWHITE "%s\n" UI_RESET, buf);
+
+        printf("\n" UI_WHITE "   What would you like to do?\n\n" UI_RESET);
+
+        if (selected == 0)
+            printf(UI_BGREEN "   >> [1] Replace it with new report\n" UI_RESET);
+        else
+            printf(UI_WHITE  "      [1] Replace it with new report\n" UI_RESET);
+
+        if (selected == 1)
+            printf(UI_BGREEN "   >> [2] Keep it and save new report alongside\n" UI_RESET);
+        else
+            printf(UI_WHITE  "      [2] Keep it and save new report alongside\n" UI_RESET);
+
+        if (selected == 2)
+            printf(UI_BGREEN "   >> [3] Cancel - go back to menu\n" UI_RESET);
+        else
+            printf(UI_WHITE  "      [3] Cancel - go back to menu\n" UI_RESET);
+
+        printf("\n" UI_WHITE " ----------------------------------------------------------\n" UI_RESET);
+        printf(UI_WHITE " [UP/DOWN] Choose   [A] Confirm\n" UI_RESET);
+
+        while (1) {
+            bool brk = false;
+            WPAD_ScanPads();
+            PAD_ScanPads();
+            wpad = WPAD_ButtonsDown(0);
+            gpad = PAD_ButtonsDown(0);
+
+            if ((wpad & WPAD_BUTTON_UP) || (gpad & PAD_BUTTON_UP)) {
+                selected--;
+                if (selected < 0) selected = 2;
+                brk = true;
+            }
+            if ((wpad & WPAD_BUTTON_DOWN) || (gpad & PAD_BUTTON_DOWN)) {
+                selected++;
+                if (selected > 2) selected = 0;
+                brk = true;
+            }
+            if ((wpad & WPAD_BUTTON_A) || (gpad & PAD_BUTTON_A)) {
+                return selected;
+            }
+            if ((wpad & WPAD_BUTTON_B) || (gpad & PAD_BUTTON_B)) {
+                return 2; /* Cancel */
+            }
+            if (brk) break;
+            VIDEO_WaitVSync();
+        }
+    }
+}
 
 /*---------------------------------------------------------------------------*/
 void run_report_generator(void) {
@@ -35,10 +134,10 @@ void run_report_generator(void) {
     ui_draw_info("This will run ALL diagnostic modules and save results.");
     {
         char pathm[128];
-        snprintf(pathm, sizeof(pathm), "Report will be saved to: %s", REPORT_PATH);
+        snprintf(pathm, sizeof(pathm), "Report will be saved to SD or USB");
         ui_draw_info(pathm);
     }
-    printf("\n");
+    ui_printf("\n");
 
     report = (char*)malloc(REPORT_MAX_SIZE);
     if (!report) {
@@ -57,14 +156,14 @@ void run_report_generator(void) {
         "----------------------------------------------------------\n\n");
 
     /* 1: System Info */
-    printf(UI_BCYAN "   [1/6]" UI_WHITE " Collecting system information...\n" UI_RESET);
+    ui_printf(UI_BCYAN "   [1/6]" UI_WHITE " Collecting system information...\n" UI_RESET);
     memset(section, 0, sizeof(section));
     get_system_info_report(section, sizeof(section));
     pos += snprintf(report + pos, REPORT_MAX_SIZE - pos, "%s", section);
     ui_draw_ok("Done.");
 
     /* 2: NAND Health */
-    printf(UI_BCYAN "   [2/6]" UI_WHITE " Scanning NAND health...\n" UI_RESET);
+    ui_printf(UI_BCYAN "   [2/6]" UI_WHITE " Scanning NAND health...\n" UI_RESET);
     {
         s32 isfs_ret = ISFS_Initialize();
         if (isfs_ret >= 0) {
@@ -79,7 +178,7 @@ void run_report_generator(void) {
     ui_draw_ok("Done.");
 
     /* 3: IOS Check */
-    printf(UI_BCYAN "   [3/6]" UI_WHITE " Scanning IOS installations...\n" UI_RESET);
+    ui_printf(UI_BCYAN "   [3/6]" UI_WHITE " Scanning IOS installations...\n" UI_RESET);
     {
         u32 title_count = 0;
         ES_GetNumTitles(&title_count);
@@ -103,7 +202,7 @@ void run_report_generator(void) {
     ui_draw_ok("Done.");
 
     /* 4: Storage */
-    printf(UI_BCYAN "   [4/6]" UI_WHITE " Checking storage devices...\n" UI_RESET);
+    ui_printf(UI_BCYAN "   [4/6]" UI_WHITE " Checking storage devices...\n" UI_RESET);
     memset(section, 0, sizeof(section));
     get_storage_test_report(section, sizeof(section));
     if (strlen(section) > 0) {
@@ -116,14 +215,15 @@ void run_report_generator(void) {
     ui_draw_ok("Done.");
 
     /* 5: Controllers */
-    printf(UI_BCYAN "   [5/6]" UI_WHITE " Checking controllers...\n" UI_RESET);
+    ui_printf(UI_BCYAN "   [5/6]" UI_WHITE " Checking controllers...\n" UI_RESET);
+    scan_controllers_quick();
     memset(section, 0, sizeof(section));
     get_controller_test_report(section, sizeof(section));
     pos += snprintf(report + pos, REPORT_MAX_SIZE - pos, "%s", section);
     ui_draw_ok("Done.");
 
     /* 6: Network */
-    printf(UI_BCYAN "   [6/6]" UI_WHITE " Checking network...\n" UI_RESET);
+    ui_printf(UI_BCYAN "   [6/6]" UI_WHITE " Checking network...\n" UI_RESET);
     memset(section, 0, sizeof(section));
     get_network_test_report(section, sizeof(section));
     if (strlen(section) > 0) {
@@ -143,29 +243,97 @@ void run_report_generator(void) {
         "then generate this report to capture all data.\n"
         "----------------------------------------------------------\n");
 
-    /* Save to SD */
-    printf("\n");
-    ui_draw_info("Saving report to SD card...");
+    /* Check for existing reports and ask user */
+    ui_printf("\n");
 
-    fp = fopen(REPORT_PATH, "w");
-    if (fp) {
-        fwrite(report, 1, strlen(report), fp);
-        fclose(fp);
-        ui_draw_ok("Report saved successfully!");
+    {
+        const char *save_path = NULL;
+        const char *base_dir  = NULL;
+        char alt_path[128];
+        long existing_sd  = check_existing_report(REPORT_PATH_SD);
+        long existing_usb = check_existing_report(REPORT_PATH_USB);
+        long existing     = -1;
+        bool cancelled    = false;
 
-        snprintf(buf, sizeof(buf), "File: %s", REPORT_PATH);
-        ui_draw_ok(buf);
+        /* Determine primary save target */
+        if (existing_sd >= 0) {
+            existing = existing_sd;
+            save_path = REPORT_PATH_SD;
+            base_dir  = "sd:";
+        } else if (existing_usb >= 0) {
+            existing = existing_usb;
+            save_path = REPORT_PATH_USB;
+            base_dir  = "usb:";
+        }
 
-        snprintf(buf, sizeof(buf), "Size: %d bytes", (int)strlen(report));
-        ui_draw_ok(buf);
+        if (existing >= 0) {
+            /* Existing report found - ask user what to do */
+            int action = ask_existing_report_action(save_path, existing);
 
-        printf("\n");
-        ui_draw_info("You can now share this file when asking for help.");
-        ui_draw_info("Copy WiiMedic_Report.txt from your SD card to your PC.");
-    } else {
-        ui_draw_err("Failed to save report!");
-        ui_draw_warn("Make sure an SD card is inserted and writable.");
-        ui_draw_info("Try reformatting the SD card as FAT32.");
+            if (action == 2) {
+                /* Cancel */
+                cancelled = true;
+                ui_draw_info("Report generation cancelled.");
+                ui_draw_info("Diagnostic data was still collected in memory.");
+            } else if (action == 1) {
+                /* Keep both - find a new filename */
+                find_next_filename(base_dir, alt_path, sizeof(alt_path));
+                save_path = alt_path;
+            }
+            /* action == 0: Replace - save_path stays the same */
+        } else {
+            /* No existing report - try SD first, then USB */
+            fp = fopen(REPORT_PATH_SD, "w");
+            if (fp) {
+                fclose(fp);
+                save_path = REPORT_PATH_SD;
+            } else {
+                fp = fopen(REPORT_PATH_USB, "w");
+                if (fp) {
+                    fclose(fp);
+                    save_path = REPORT_PATH_USB;
+                }
+            }
+        }
+
+        if (!cancelled && save_path) {
+            ui_draw_info("Saving report...");
+            fp = fopen(save_path, "w");
+            if (fp) {
+                fwrite(report, 1, strlen(report), fp);
+                fclose(fp);
+
+                ui_draw_ok("Report saved successfully!");
+
+                snprintf(buf, sizeof(buf), "File: %s", save_path);
+                ui_draw_ok(buf);
+
+                snprintf(buf, sizeof(buf), "Size: %d bytes", (int)strlen(report));
+                ui_draw_ok(buf);
+
+                if (existing >= 0) {
+                    if (strcmp(save_path, REPORT_PATH_SD) == 0 ||
+                        strcmp(save_path, REPORT_PATH_USB) == 0) {
+                        ui_draw_info("Previous report was replaced.");
+                    } else {
+                        ui_draw_info("Previous report was kept.");
+                        snprintf(buf, sizeof(buf), "New report: %s", save_path);
+                        ui_draw_info(buf);
+                    }
+                }
+
+                ui_printf("\n");
+                ui_draw_info("You can now share this file when asking for help.");
+                ui_draw_info("Copy the report from your SD/USB to your PC.");
+            } else {
+                ui_draw_err("Failed to save report!");
+                ui_draw_warn("Make sure an SD card or USB drive is inserted and writable.");
+                ui_draw_info("Try reformatting as FAT32.");
+            }
+        } else if (!cancelled) {
+            ui_draw_err("No writable storage found!");
+            ui_draw_warn("Insert an SD card or USB drive to save the report.");
+        }
     }
 
     free(report);

@@ -74,7 +74,7 @@ void run_network_test(void) {
 
     ui_draw_info("Initializing network interface...");
     ui_draw_info("This may take up to 15 seconds...");
-    printf("\n");
+    ui_printf("\n");
 
     ret = net_init();
 
@@ -84,7 +84,7 @@ void run_network_test(void) {
             snprintf(msg, sizeof(msg), "Network initialization failed (error %d)", ret);
             ui_draw_err(msg);
         }
-        printf("\n");
+        ui_printf("\n");
 
         switch (ret) {
             case -EAGAIN:
@@ -145,7 +145,7 @@ void run_network_test(void) {
         bool dns_ok  = test_tcp_connection("Google DNS (8.8.8.8:53)",  0x08080808, 53);
         bool http_ok = test_tcp_connection("HTTP Test (1.1.1.1:80)",   0x01010101, 80);
 
-        printf("\n");
+        ui_printf("\n");
 
         if (dns_ok && http_ok) {
             ui_draw_ok("Internet connectivity: FULL");
@@ -159,7 +159,7 @@ void run_network_test(void) {
             ui_draw_info("Check router settings / firewall");
         }
     } else {
-        printf("   " UI_WHITE "Skipping connection tests (no IP address)\n" UI_RESET);
+        ui_printf("   " UI_WHITE "Skipping connection tests (no IP address)\n" UI_RESET);
     }
 
     /* Tips */
@@ -183,7 +183,7 @@ void run_network_test(void) {
 
     net_deinit();
 
-    printf("\n");
+    ui_printf("\n");
     ui_draw_ok("Network test complete");
 }
 

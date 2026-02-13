@@ -95,10 +95,11 @@ static void run_subscreen(const char *title, void (*func)(void)) {
     ui_clear();
     ui_draw_banner();
     ui_draw_section(title);
+    printf(UI_WHITE "   Processing, please wait...\n" UI_RESET);
 
+    ui_scroll_begin();
     func();
-
-    ui_wait_button();
+    ui_scroll_view(title);
 }
 
 /*---------------------------------------------------------------------------*/

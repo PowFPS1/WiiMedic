@@ -68,7 +68,7 @@ void run_ios_check(void) {
     int rpos = 0;
 
     ui_draw_info("Scanning installed IOS versions...");
-    printf("\n");
+    ui_printf("\n");
 
     ret = ES_GetNumTitles(&title_count);
     if (ret < 0 || title_count == 0) {
@@ -94,9 +94,9 @@ void run_ios_check(void) {
     }
 
     /* Table header */
-    printf(UI_BCYAN "   %-8s %-12s %-10s %s\n" UI_RESET,
+    ui_printf(UI_BCYAN "   %-8s %-12s %-10s %s\n" UI_RESET,
            "IOS", "Revision", "Status", "Notes");
-    printf(UI_WHITE "   -------- ------------ ---------- --------------------------\n" UI_RESET);
+    ui_printf(UI_WHITE "   -------- ------------ ---------- --------------------------\n" UI_RESET);
 
     s_total_ios = 0;
     s_stub_count = 0;
@@ -162,7 +162,7 @@ void run_ios_check(void) {
             color = UI_BGREEN;
         }
 
-        printf("   %sIOS%-4u  rev %-8u %-10s" UI_WHITE " %s\n" UI_RESET,
+        ui_printf("   %sIOS%-4u  rev %-8u %-10s" UI_WHITE " %s\n" UI_RESET,
                color, title_lower, revision, status, desc);
 
         rpos += snprintf(s_report + rpos, MAX_REPORT - rpos,
@@ -200,7 +200,7 @@ void run_ios_check(void) {
         s_total_ios, s_total_ios - s_stub_count, s_stub_count, s_cios_count);
 
     /* Recommendations */
-    printf("\n");
+    ui_printf("\n");
     if (s_cios_count > 0) {
         ui_draw_ok("cIOS detected - USB loaders should work properly");
     } else {
@@ -208,7 +208,7 @@ void run_ios_check(void) {
         ui_draw_info("Install d2x cIOS via d2x cIOS Installer");
     }
 
-    printf("\n");
+    ui_printf("\n");
     ui_draw_ok("IOS scan complete");
 }
 

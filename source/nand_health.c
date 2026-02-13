@@ -45,7 +45,7 @@ void run_nand_health(void) {
     float cluster_pct, inode_pct;
 
     ui_draw_info("Initializing NAND filesystem scan...");
-    printf("\n");
+    ui_printf("\n");
 
     ret = ISFS_Initialize();
     if (ret < 0) {
@@ -82,7 +82,7 @@ void run_nand_health(void) {
         ui_draw_kv("Clusters Free", buf);
     }
 
-    printf("\n   Cluster Usage:\n");
+    ui_printf("\n   Cluster Usage:\n");
     ui_draw_bar(s_used_blocks, NAND_TOTAL_CLUSTERS, 40);
 
     {
@@ -94,7 +94,7 @@ void run_nand_health(void) {
         ui_draw_kv("Inodes Free", buf);
     }
 
-    printf("\n   Inode Usage:\n");
+    ui_printf("\n   Inode Usage:\n");
     ui_draw_bar(s_used_inodes, NAND_TOTAL_INODES, 40);
 
     /* Directory scan */
@@ -175,19 +175,19 @@ void run_nand_health(void) {
             strcpy(s_health_status, "GOOD");
             snprintf(score_msg, sizeof(score_msg),
                      "NAND Health Score: %d/100 - %s", s_health_score, s_health_status);
-            printf("\n");
+            ui_printf("\n");
             ui_draw_ok(score_msg);
         } else if (s_health_score >= 50) {
             strcpy(s_health_status, "FAIR - Monitor closely");
             snprintf(score_msg, sizeof(score_msg),
                      "NAND Health Score: %d/100 - %s", s_health_score, s_health_status);
-            printf("\n");
+            ui_printf("\n");
             ui_draw_warn(score_msg);
         } else {
             strcpy(s_health_status, "POOR - Action recommended");
             snprintf(score_msg, sizeof(score_msg),
                      "NAND Health Score: %d/100 - %s", s_health_score, s_health_status);
-            printf("\n");
+            ui_printf("\n");
             ui_draw_err(score_msg);
         }
     }
@@ -203,7 +203,7 @@ void run_nand_health(void) {
             ui_draw_info("Too many files on NAND - consider cleanup");
     }
 
-    printf("\n");
+    ui_printf("\n");
     ui_draw_ok("NAND health check complete");
 
     ISFS_Deinitialize();

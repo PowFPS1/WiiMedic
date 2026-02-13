@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="icon.png" alt="WiiMedic Logo" width="256" height="96" />
+  <img src="icon.png" alt="WiiMedic Logo" width="128" height="48" />
 </p>
 
 # WiiMedic - Wii System Diagnostic & Health Monitor

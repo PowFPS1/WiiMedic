@@ -21,9 +21,6 @@
 #include "storage_test.h"
 #include "controller_test.h"
 #include "network_test.h"
-#include "recommendations.h"
-#include "nand_backup.h"
-#include "history.h"
 
 #define REPORT_MAX_SIZE  32768
 #define REPORT_PATH_SD   "sd:/WiiMedic_Report.txt"
@@ -159,14 +156,14 @@ void run_report_generator(void) {
         "----------------------------------------------------------\n\n");
 
     /* 1: System Info */
-    ui_printf(UI_BCYAN "   [1/8]" UI_WHITE " Collecting system information...\n" UI_RESET);
+    ui_printf(UI_BCYAN "   [1/6]" UI_WHITE " Collecting system information...\n" UI_RESET);
     memset(section, 0, sizeof(section));
     get_system_info_report(section, sizeof(section));
     pos += snprintf(report + pos, REPORT_MAX_SIZE - pos, "%s", section);
     ui_draw_ok("Done.");
 
     /* 2: NAND Health */
-    ui_printf(UI_BCYAN "   [2/8]" UI_WHITE " Scanning NAND health...\n" UI_RESET);
+    ui_printf(UI_BCYAN "   [2/6]" UI_WHITE " Scanning NAND health...\n" UI_RESET);
     {
         s32 isfs_ret = ISFS_Initialize();
         if (isfs_ret >= 0) {
@@ -181,7 +178,7 @@ void run_report_generator(void) {
     ui_draw_ok("Done.");
 
     /* 3: IOS Check */
-    ui_printf(UI_BCYAN "   [3/8]" UI_WHITE " Scanning IOS installations...\n" UI_RESET);
+    ui_printf(UI_BCYAN "   [3/6]" UI_WHITE " Scanning IOS installations...\n" UI_RESET);
     {
         u32 title_count = 0;
         ES_GetNumTitles(&title_count);
@@ -205,7 +202,7 @@ void run_report_generator(void) {
     ui_draw_ok("Done.");
 
     /* 4: Storage */
-    ui_printf(UI_BCYAN "   [4/8]" UI_WHITE " Checking storage devices...\n" UI_RESET);
+    ui_printf(UI_BCYAN "   [4/6]" UI_WHITE " Checking storage devices...\n" UI_RESET);
     memset(section, 0, sizeof(section));
     get_storage_test_report(section, sizeof(section));
     if (strlen(section) > 0) {
@@ -218,7 +215,7 @@ void run_report_generator(void) {
     ui_draw_ok("Done.");
 
     /* 5: Controllers */
-    ui_printf(UI_BCYAN "   [5/8]" UI_WHITE " Checking controllers...\n" UI_RESET);
+    ui_printf(UI_BCYAN "   [5/6]" UI_WHITE " Checking controllers...\n" UI_RESET);
     scan_controllers_quick();
     memset(section, 0, sizeof(section));
     get_controller_test_report(section, sizeof(section));
@@ -226,7 +223,7 @@ void run_report_generator(void) {
     ui_draw_ok("Done.");
 
     /* 6: Network */
-    ui_printf(UI_BCYAN "   [6/8]" UI_WHITE " Checking network...\n" UI_RESET);
+    ui_printf(UI_BCYAN "   [6/6]" UI_WHITE " Checking network...\n" UI_RESET);
     memset(section, 0, sizeof(section));
     get_network_test_report(section, sizeof(section));
     if (strlen(section) > 0) {
@@ -235,22 +232,6 @@ void run_report_generator(void) {
         pos += snprintf(report + pos, REPORT_MAX_SIZE - pos,
             "=== NETWORK TEST ===\n"
             "Run Network Test from main menu first to populate this section.\n\n");
-    }
-    ui_draw_ok("Done.");
-
-    /* 7: NAND Backup Safety */
-    ui_printf(UI_BCYAN "   [7/8]" UI_WHITE " Checking NAND backup safety...\n" UI_RESET);
-    memset(section, 0, sizeof(section));
-    get_nand_backup_report(section, sizeof(section));
-    pos += snprintf(report + pos, REPORT_MAX_SIZE - pos, "%s", section);
-    ui_draw_ok("Done.");
-
-    /* 8: Recommendations */
-    ui_printf(UI_BCYAN "   [8/8]" UI_WHITE " Generating recommendations...\n" UI_RESET);
-    memset(section, 0, sizeof(section));
-    get_recommendations_report(section, sizeof(section));
-    if (strlen(section) > 0) {
-        pos += snprintf(report + pos, REPORT_MAX_SIZE - pos, "%s", section);
     }
     ui_draw_ok("Done.");
 
@@ -263,10 +244,6 @@ void run_report_generator(void) {
         "----------------------------------------------------------\n");
 
     /* Check for existing reports and ask user */
-    ui_printf("\n");
-
-    /* Save a diagnostic snapshot for history tracking */
-    history_save_snapshot();
     ui_printf("\n");
 
     {

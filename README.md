@@ -1,102 +1,216 @@
 <img width="128" height="48" alt="image" src="https://github.com/user-attachments/assets/6937a77d-bce6-4666-9780-0feb9afc5b78" />
 
 
-# WiiMedic
+# WiiMedic - Wii System Diagnostic & Health Monitor
 
-Diagnostic tool for the Wii. Checks your system health, tests hardware, and spits out a report you can share when something's not working right.
+**Version 1.1.0** | Wii Homebrew Application
 
-**v1.1.0** — [WiiBrew Page](https://wiibrew.org/wiki/WiiMedic) · [Open Shop Channel PR](https://github.com/OpenShopChannel/Apps/pull/141)
+A comprehensive all-in-one diagnostic tool for the Nintendo Wii. As Wii consoles age (now 20 years old!), hardware issues become increasingly common. WiiMedic gives you a complete picture of your system's health and generates shareable reports for community troubleshooting.
 
----
-
-## What it does
-
-WiiMedic has 7 modules you can run from a simple menu:
-
-- **System Info** — Region, video mode, Hollywood revision, Boot2 version, memory, running IOS, etc.
-- **NAND Health** — Cluster/inode usage with visual bars, scans directories for issues, gives you a health score out of 100
-- **IOS Scan** — Lists every IOS installed with revision numbers. Flags stubs, cIOS (d2x/Waninkoko), and BootMii
-- **Storage Test** — Benchmarks your SD and USB read/write speeds. Tells you if your card is too slow for game loading
-- **Controller Test** — Checks all 4 GC ports and Wii Remote slots. Reads sticks, buttons, triggers. Catches stick drift
-- **Network Test** — Tests WiFi init, grabs your IP, tries connecting to Google DNS and Cloudflare to check internet
-- **Full Report** — Runs everything above and dumps it to a text file on your SD/USB. Great for posting on Reddit or GBAtemp when you need help
-
-All screens scroll if the output is longer than what fits on screen.
+- [WiiBrew Page](https://wiibrew.org/wiki/WiiMedic)
+- [Open Shop Channel Submission](https://github.com/OpenShopChannel/Apps/pull/141)
 
 ---
 
-## Install
+## Features
 
-Download the [latest release](https://github.com/PowFPS1/WiiMedic/releases), extract the zip, and copy the `apps` folder to the root of your SD card or USB drive. You should end up with:
+### 1. System Information
+- Console region, firmware version, and video standard
+- Hollywood/Broadway hardware revisions
+- Device ID and Boot2 version (with BootMii compatibility warning)
+- Memory arena status (MEM1/MEM2)
+- Display settings (aspect ratio, progressive scan)
 
+### 2. NAND Health Check
+- Scans NAND filesystem cluster and inode usage
+- Visual usage bar graphs with color-coded warnings
+- Directory-level scan (/sys, /ticket, /title, /shared1, /tmp, /import)
+- Detects interrupted title installations
+- Calculates a health score out of 100
+- Provides actionable recommendations
+
+### 3. IOS Installation Scan
+- Enumerates ALL installed IOS versions with revision numbers
+- Detects stub IOS (potential problem sources)
+- Identifies cIOS installations (d2x, Waninkoko, etc.)
+- Detects BootMii IOS
+- Descriptions for important IOS slots
+- Warns if no cIOS is found for USB loader compatibility
+
+### 4. Storage Speed Test
+- Benchmarks SD card read/write speeds (1MB test, 3 iterations)
+- Benchmarks USB drive read/write speeds
+- Reports speed ratings (Excellent/Acceptable/Slow)
+- Counts homebrew apps in /apps directory
+- Tips for optimal storage configuration
+
+### 5. Controller Diagnostics
+- Tests all 4 GameCube controller ports
+- Tests all 4 Wii Remote channels with Bluetooth warmup for accurate detection
+- Real-time button, stick, and trigger readings
+- Detects analog stick drift with threshold warnings
+- Identifies Wii Remote extensions (Nunchuk, Classic Controller, etc.)
+- Battery level monitoring for Wii Remotes
+- IR sensor functionality check
+
+### 6. Network Connectivity Test
+- WiFi module initialization test
+- IP address configuration display
+- DHCP validation
+- TCP connectivity tests to known servers
+- Internet connectivity rating (Full/Partial/None)
+- Tips for Wiimmfi and WiiLink connectivity
+
+### 7. Full Report Generator
+- Runs all diagnostics and saves to `sd:/WiiMedic_Report.txt`
+- Falls back to `usb:/WiiMedic_Report.txt` if no SD card is available
+- Detects existing reports: choose to replace, keep both, or cancel
+- When keeping both, saves as `WiiMedic_Report_2.txt`, `_3.txt`, etc.
+- Shareable plain text format
+- Perfect for pasting into forum posts or Reddit when asking for help
+
+---
+
+## Installation
+
+### Method 1: SD Card
+1. Download the latest release
+2. Copy the `WiiMedic` folder to `/apps/` on your SD card
+3. The folder structure should be: `SD:/apps/WiiMedic/boot.dol`
+4. Insert SD card into your Wii
+5. Launch from the Homebrew Channel
+
+### Method 2: USB Drive
+1. Download the latest release
+2. Copy the `WiiMedic` folder to `/apps/` on your USB drive
+3. The folder structure should be: `USB:/apps/WiiMedic/boot.dol`
+4. Insert USB drive into your Wii (use the bottom port)
+5. Launch from the Homebrew Channel
+
+### Required Files
 ```
-SD:/apps/WiiMedic/boot.dol
-SD:/apps/WiiMedic/meta.xml
-SD:/apps/WiiMedic/icon.png
+/apps/WiiMedic/
+├── boot.dol          # Main application
+├── meta.xml          # App metadata for Homebrew Channel
+└── icon.png          # App icon (optional, 128x48)
 ```
 
-Then just launch it from the Homebrew Channel. USB goes in the bottom port.
+---
+
+## Building from Source
+
+### Prerequisites
+- [devkitPro](https://devkitpro.org/) with devkitPPC
+- libogc (included with devkitPro)
+- libfat (included with devkitPro)
+
+### Build Steps
+```bash
+# Install devkitPro (if not already installed)
+# Follow instructions at https://devkitpro.org/wiki/Getting_Started
+
+# Set environment variable
+export DEVKITPPC=/opt/devkitpro/devkitPPC
+
+# Clone and build
+cd WiiMedic
+make
+
+# Output: boot.dol (copy to SD:/apps/WiiMedic/)
+```
+
+### Build on Windows
+```powershell
+# After installing devkitPro via installer
+# Open MSys2 terminal from devkitPro
+cd WiiMedic
+make
+```
+
+### Clean Build
+```bash
+make clean
+make
+```
 
 ---
 
 ## Controls
 
-| Button | What it does |
-|--------|-------------|
-| D-Pad Up/Down | Navigate menu, scroll through results |
-| D-Pad Left/Right | Page up/down in scroll view |
-| A | Select / Confirm |
-| B | Back to menu |
-| HOME / START | Quit to HBC |
+| Button | Action |
+|--------|--------|
+| **D-Pad Up/Down** | Navigate menu / Scroll line-by-line |
+| **D-Pad Left/Right** | Page up / Page down (in scroll view) |
+| **A Button** | Select / Confirm |
+| **B Button** | Return to menu (from sub-screen) |
+| **HOME** (Wii Remote) / **START** (GC Controller) | Exit to Homebrew Channel |
 
-Works with Wii Remote and GameCube controllers.
+All diagnostic screens support **scrolling** — if content exceeds the screen, use UP/DOWN to scroll line-by-line or LEFT/RIGHT to jump a full page. A line counter is shown in the bottom-right corner.
 
----
-
-## Report
-
-The report generator runs all 6 tests and writes everything to `WiiMedic_Report.txt` on your SD card (or USB if there's no SD). If there's already a report file, it'll ask you whether to overwrite it, save a new one alongside it, or just cancel.
-
-No personal info is included besides the console's Device ID.
+Works with both **Wii Remote** and **GameCube Controller**.
 
 ---
 
-## Building
+## Report Sharing
 
-You need [devkitPro](https://devkitpro.org/) with devkitPPC installed.
+After generating a report, the file is saved as `WiiMedic_Report.txt` on your SD card or USB drive. To share it:
 
-```bash
-cd WiiMedic
-make
-```
+1. Remove SD card / USB drive from Wii and insert into PC
+2. Open `WiiMedic_Report.txt`
+3. Copy and paste the contents into a forum post, Reddit thread, or Discord message
+4. The report contains NO personal information beyond your Wii's Device ID
 
-That gives you `boot.dol`. Copy it to `SD:/apps/WiiMedic/`. Use `make clean` first if you want a fresh build.
-
-On Windows, run it through devkitPro's MSYS2 terminal.
+If a previous report exists, WiiMedic will ask whether to replace it, save alongside it (numbered), or cancel.
 
 ---
 
-## Why
+## Technical Details
 
-Wiis are old. Stuff breaks — NAND goes bad, controllers drift, WiFi dies, SD cards get slow, and people end up confused about their IOS setup. You see it all the time on r/WiiHacks: "is my Wii broken?" or "why won't USB Loader work?"
+- **Language:** C
+- **Toolchain:** devkitPPC (GCC for PowerPC)
+- **Libraries:** libogc, libfat, wiiuse, bte
+- **Target:** Nintendo Wii (Homebrew Channel)
+- **Output:** DOL executable
+- **Architecture:** PowerPC 750CL (Broadway)
+- **Compatibility:** All Wii models (RVL-001, RVL-101), Wii U vWii
 
-This just gives you a quick way to check everything and get a report you can share.
+---
+
+## Why WiiMedic?
+
+As of 2026, the Nintendo Wii is 20 years old. The homebrew community is thriving, but aging hardware brings challenges:
+
+- **NAND degradation** - Bad blocks develop over time
+- **Stick drift** - Analog sticks wear out on controllers
+- **WiFi issues** - Wireless modules can degrade
+- **Storage problems** - SD cards and USB drives fail silently
+- **Softmod confusion** - Users can't easily verify their setup is correct
+
+People frequently post on r/WiiHacks and GBAtemp asking "is my Wii broken?" or "why isn't this working?" WiiMedic gives them (and you) a quick, comprehensive answer.
 
 ---
 
 ## Changelog
 
-**v1.1.0**
-- Scrolling on all diagnostic screens
-- Fixed Wii Remote not showing up in controller test and reports
-- Report asks what to do if a previous report already exists
-- Falls back to USB if SD isn't available for saving reports
+### v1.1.0
+- Added scrollable diagnostic screens (UP/DOWN line-by-line, LEFT/RIGHT page)
+- Fixed Wii Remote detection in Controller Diagnostics and Report Generator
+- Report now detects existing reports: replace, keep both, or cancel
+- Report falls back to USB if no SD card is available
+- All module output routed through scroll buffer system
 
-**v1.0.0**
-- First release. All 7 modules working
+### v1.0.0
+- Initial release
+- 7 diagnostic modules: System Info, NAND Health, IOS Check, Storage Test, Controller Diagnostics, Network Test, Report Generator
 
 ---
 
 ## Credits
 
-Built with [devkitPro](https://devkitpro.org/) and [libogc](https://github.com/devkitPro/libogc). Thanks to r/WiiHacks and GBAtemp.
+- Built with [devkitPro](https://devkitpro.org/) / [libogc](https://github.com/devkitPro/libogc)
+- Inspired by the Wii homebrew community's need for better diagnostic tools
+- Thanks to the r/WiiHacks and GBAtemp communities
+
+---
+
+*Stay healthy!* 🎮

@@ -7,12 +7,56 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <malloc.h>
 #include <gccore.h>
 #include <wiiuse/wpad.h>
 #include <fat.h>
 #include <ogc/system.h>
+#include <ogc/es.h>
 
 #include "ui_common.h"
+
+/* Homebrew Channel title IDs (HAXX and JODI variants) */
+static const u64 HBC_TITLE_IDS[] = {
+    0x00010001AF1BF516ULL,  /* OHBC - newest HBC */
+    0x0001000148415858ULL,  /* HAXX */
+    0x000100014A4F4449ULL,  /* JODI */
+    0x000100014C554C5AULL,  /* LULZ (HBC 1.0.7+) */
+};
+#define HBC_TITLE_COUNT (sizeof(HBC_TITLE_IDS) / sizeof(HBC_TITLE_IDS[0]))
+
+static void return_to_hbc(void) {
+    u32 num_titles = 0;
+    u64 *title_list = NULL;
+    int i;
+
+    /* Get installed title count */
+    if (ES_GetNumTitles(&num_titles) < 0 || num_titles == 0)
+        goto fallback;
+
+    title_list = (u64 *)memalign(32, num_titles * sizeof(u64));
+    if (!title_list) goto fallback;
+
+    if (ES_GetTitles(title_list, num_titles) < 0)
+        goto fallback;
+
+    /* Search for a known HBC title ID */
+    for (i = 0; i < (int)HBC_TITLE_COUNT; i++) {
+        u32 j;
+        for (j = 0; j < num_titles; j++) {
+            if (title_list[j] == HBC_TITLE_IDS[i]) {
+                free(title_list);
+                WII_LaunchTitle(HBC_TITLE_IDS[i]);
+                return; /* shouldn't reach here */
+            }
+        }
+    }
+
+fallback:
+    if (title_list) free(title_list);
+    /* If HBC not found, fall back to system menu */
+    SYS_ResetSystem(SYS_RETURNTOMENU, 0, 0);
+}
 #include "system_info.h"
 #include "nand_health.h"
 #include "ios_check.h"
@@ -167,6 +211,6 @@ int main(int argc, char **argv) {
     ui_clear();
     printf(UI_BGREEN "\n  WiiMedic shutting down. Stay healthy!\n\n" UI_RESET);
     WPAD_Shutdown();
-    SYS_ResetSystem(SYS_RETURNTOMENU, 0, 0);
+    return_to_hbc();
     return 0;
 }

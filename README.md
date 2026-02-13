@@ -4,7 +4,7 @@
 
 # WiiMedic - Wii System Diagnostic & Health Monitor
 
-**Version 1.1.0** | Wii Homebrew Application
+**Version 1.2.0** | Wii Homebrew Application
 
 A comprehensive all-in-one diagnostic tool for the Nintendo Wii. As Wii consoles age (now 20 years old!), hardware issues become increasingly common. WiiMedic gives you a complete picture of your system's health and generates shareable reports for community troubleshooting.
 
@@ -15,14 +15,42 @@ A comprehensive all-in-one diagnostic tool for the Nintendo Wii. As Wii consoles
 
 ## Features
 
-### 1. System Information
+### NEW: Smart Tools (v1.2.0)
+
+### 1. System Checkup + Auto-Detect Recommendations
+- Automatically scans NAND safety, health, IOS setup, storage, and controllers
+- Issues ranked by severity: **CRITICAL** / **WARNING** / **TIP**
+- Each issue includes a plain-English explanation and step-by-step fix
+- Designed for beginners — turns raw data into actionable advice
+
+### 2. NAND Backup Safety Check
+- Detects BootMii installation (IOS254/IOS236)
+- Scans SD/USB for `nand.bin` and `keys.bin`
+- Checks Boot2 version for boot2 installation eligibility
+- Detects Priiloader on SD card
+- Calculates a **Brick Protection Safety Score** (0-100)
+- Big warning if no backup exists, with full setup instructions
+
+### 3. Diagnostic History & Trend Tracking
+- Saves timestamped snapshots of system health to SD/USB
+- Compares current run vs previous (NAND usage, health score, IOS counts)
+- Color-coded trend indicators: improved / unchanged / WORSE
+- Health score timeline showing last 10 runs
+- Stores up to 50 snapshots in a compact binary file
+- Auto-saves a snapshot when generating a full report
+
+---
+
+### Diagnostic Modules
+
+### 4. System Information
 - Console region, firmware version, and video standard
 - Hollywood/Broadway hardware revisions
 - Device ID and Boot2 version (with BootMii compatibility warning)
 - Memory arena status (MEM1/MEM2)
 - Display settings (aspect ratio, progressive scan)
 
-### 2. NAND Health Check
+### 5. NAND Health Check
 - Scans NAND filesystem cluster and inode usage
 - Visual usage bar graphs with color-coded warnings
 - Directory-level scan (/sys, /ticket, /title, /shared1, /tmp, /import)
@@ -30,7 +58,7 @@ A comprehensive all-in-one diagnostic tool for the Nintendo Wii. As Wii consoles
 - Calculates a health score out of 100
 - Provides actionable recommendations
 
-### 3. IOS Installation Scan
+### 6. IOS Installation Scan
 - Enumerates ALL installed IOS versions with revision numbers
 - Detects stub IOS (potential problem sources)
 - Identifies cIOS installations (d2x, Waninkoko, etc.)
@@ -38,14 +66,14 @@ A comprehensive all-in-one diagnostic tool for the Nintendo Wii. As Wii consoles
 - Descriptions for important IOS slots
 - Warns if no cIOS is found for USB loader compatibility
 
-### 4. Storage Speed Test
+### 7. Storage Speed Test
 - Benchmarks SD card read/write speeds (1MB test, 3 iterations)
 - Benchmarks USB drive read/write speeds
 - Reports speed ratings (Excellent/Acceptable/Slow)
 - Counts homebrew apps in /apps directory
 - Tips for optimal storage configuration
 
-### 5. Controller Diagnostics
+### 8. Controller Diagnostics
 - Tests all 4 GameCube controller ports
 - Tests all 4 Wii Remote channels with Bluetooth warmup for accurate detection
 - Real-time button, stick, and trigger readings
@@ -54,7 +82,7 @@ A comprehensive all-in-one diagnostic tool for the Nintendo Wii. As Wii consoles
 - Battery level monitoring for Wii Remotes
 - IR sensor functionality check
 
-### 6. Network Connectivity Test
+### 9. Network Connectivity Test
 - WiFi module initialization test
 - IP address configuration display
 - DHCP validation
@@ -62,11 +90,13 @@ A comprehensive all-in-one diagnostic tool for the Nintendo Wii. As Wii consoles
 - Internet connectivity rating (Full/Partial/None)
 - Tips for Wiimmfi and WiiLink connectivity
 
-### 7. Full Report Generator
+### 10. Full Report Generator
 - Runs all diagnostics and saves to `sd:/WiiMedic_Report.txt`
 - Falls back to `usb:/WiiMedic_Report.txt` if no SD card is available
 - Detects existing reports: choose to replace, keep both, or cancel
 - When keeping both, saves as `WiiMedic_Report_2.txt`, `_3.txt`, etc.
+- Now includes NAND backup safety status and recommendations in the report
+- Automatically saves a diagnostic history snapshot
 - Shareable plain text format
 - Perfect for pasting into forum posts or Reddit when asking for help
 
@@ -193,6 +223,15 @@ People frequently post on r/WiiHacks and GBAtemp asking "is my Wii broken?" or "
 
 ## Changelog
 
+### v1.2.0
+- **System Checkup + Recommendations**: Auto-detect issues with beginner-friendly advice (CRITICAL/WARNING/TIP)
+- **NAND Backup Safety Check**: BootMii, nand.bin, keys.bin, Priiloader detection with Safety Score
+- **Diagnostic History**: Save/compare snapshots over time, track NAND degradation and IOS changes
+- Menu reorganized into Smart Tools + Diagnostic Modules
+- Reports now include NAND backup status and recommendations
+- History snapshot auto-saved when generating a report
+- Exit now returns to Homebrew Channel (not System Menu)
+
 ### v1.1.0
 - Added scrollable diagnostic screens (UP/DOWN line-by-line, LEFT/RIGHT page)
 - Fixed Wii Remote detection in Controller Diagnostics and Report Generator
@@ -203,6 +242,8 @@ People frequently post on r/WiiHacks and GBAtemp asking "is my Wii broken?" or "
 ### v1.0.0
 - Initial release
 - 7 diagnostic modules: System Info, NAND Health, IOS Check, Storage Test, Controller Diagnostics, Network Test, Report Generator
+
+---
 
 ---
 

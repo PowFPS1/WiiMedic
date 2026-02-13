@@ -3,9 +3,12 @@
 
 # WiiMedic - Wii System Diagnostic & Health Monitor
 
-**Version 1.0.0** | Wii Homebrew Application
+**Version 1.1.0** | Wii Homebrew Application
 
 A comprehensive all-in-one diagnostic tool for the Nintendo Wii. As Wii consoles age (now 20 years old!), hardware issues become increasingly common. WiiMedic gives you a complete picture of your system's health and generates shareable reports for community troubleshooting.
+
+- [WiiBrew Page](https://wiibrew.org/wiki/WiiMedic)
+- [Open Shop Channel Submission](https://github.com/OpenShopChannel/Apps/pull/141)
 
 ---
 
@@ -43,7 +46,7 @@ A comprehensive all-in-one diagnostic tool for the Nintendo Wii. As Wii consoles
 
 ### 5. Controller Diagnostics
 - Tests all 4 GameCube controller ports
-- Tests all 4 Wii Remote channels
+- Tests all 4 Wii Remote channels with Bluetooth warmup for accurate detection
 - Real-time button, stick, and trigger readings
 - Detects analog stick drift with threshold warnings
 - Identifies Wii Remote extensions (Nunchuk, Classic Controller, etc.)
@@ -60,6 +63,9 @@ A comprehensive all-in-one diagnostic tool for the Nintendo Wii. As Wii consoles
 
 ### 7. Full Report Generator
 - Runs all diagnostics and saves to `sd:/WiiMedic_Report.txt`
+- Falls back to `usb:/WiiMedic_Report.txt` if no SD card is available
+- Detects existing reports: choose to replace, keep both, or cancel
+- When keeping both, saves as `WiiMedic_Report_2.txt`, `_3.txt`, etc.
 - Shareable plain text format
 - Perfect for pasting into forum posts or Reddit when asking for help
 
@@ -133,10 +139,13 @@ make
 
 | Button | Action |
 |--------|--------|
-| **D-Pad Up/Down** | Navigate menu |
+| **D-Pad Up/Down** | Navigate menu / Scroll line-by-line |
+| **D-Pad Left/Right** | Page up / Page down (in scroll view) |
 | **A Button** | Select / Confirm |
 | **B Button** | Return to menu (from sub-screen) |
 | **HOME** (Wii Remote) / **START** (GC Controller) | Exit to Homebrew Channel |
+
+All diagnostic screens support **scrolling** — if content exceeds the screen, use UP/DOWN to scroll line-by-line or LEFT/RIGHT to jump a full page. A line counter is shown in the bottom-right corner.
 
 Works with both **Wii Remote** and **GameCube Controller**.
 
@@ -144,12 +153,14 @@ Works with both **Wii Remote** and **GameCube Controller**.
 
 ## Report Sharing
 
-After generating a report, the file is saved as `WiiMedic_Report.txt` in the root of your SD card. To share it:
+After generating a report, the file is saved as `WiiMedic_Report.txt` on your SD card or USB drive. To share it:
 
-1. Remove SD card from Wii and insert into PC
+1. Remove SD card / USB drive from Wii and insert into PC
 2. Open `WiiMedic_Report.txt`
 3. Copy and paste the contents into a forum post, Reddit thread, or Discord message
 4. The report contains NO personal information beyond your Wii's Device ID
+
+If a previous report exists, WiiMedic will ask whether to replace it, save alongside it (numbered), or cancel.
 
 ---
 
@@ -176,6 +187,21 @@ As of 2026, the Nintendo Wii is 20 years old. The homebrew community is thriving
 - **Softmod confusion** - Users can't easily verify their setup is correct
 
 People frequently post on r/WiiHacks and GBAtemp asking "is my Wii broken?" or "why isn't this working?" WiiMedic gives them (and you) a quick, comprehensive answer.
+
+---
+
+## Changelog
+
+### v1.1.0
+- Added scrollable diagnostic screens (UP/DOWN line-by-line, LEFT/RIGHT page)
+- Fixed Wii Remote detection in Controller Diagnostics and Report Generator
+- Report now detects existing reports: replace, keep both, or cancel
+- Report falls back to USB if no SD card is available
+- All module output routed through scroll buffer system
+
+### v1.0.0
+- Initial release
+- 7 diagnostic modules: System Info, NAND Health, IOS Check, Storage Test, Controller Diagnostics, Network Test, Report Generator
 
 ---
 

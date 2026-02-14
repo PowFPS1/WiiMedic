@@ -215,6 +215,8 @@ People frequently post on r/WiiHacks and GBAtemp asking "is my Wii broken?" or "
 ## Credits
 
 - Developed by **PowFPS1**
+- **Abdelali221** — help with WiFi card info and AP scan implementation in the network code
 - Built with [devkitPro](https://devkitpro.org/) / [libogc](https://github.com/devkitPro/libogc)
 - Inspired by the Wii homebrew community's need for better diagnostic tools
+
 - Thanks to the r/WiiHacks and GBAtemp communities

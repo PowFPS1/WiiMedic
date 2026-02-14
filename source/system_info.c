@@ -18,19 +18,62 @@
 /*---------------------------------------------------------------------------*/
 /* Brick protection detection helpers                                        */
 /*---------------------------------------------------------------------------*/
-static bool detect_priiloader(void) {
-  /* Priiloader uses /apps/priiloader/ on SD and USB for everyone. */
-  DIR *d = opendir("sd:/apps/priiloader");
-  if (d) {
-    closedir(d);
-    return true;
-  }
-  d = opendir("usb:/apps/priiloader");
-  if (d) {
-    closedir(d);
-    return true;
+/* Check for Priiloader app folder on SD/USB (multiple path and case variants). */
+static bool detect_priiloader_folder(void) {
+  static const char *paths[] = {
+    "sd:/apps/priiloader",
+    "sd:/apps/Priiloader",
+    "usb:/apps/priiloader",
+    "usb:/apps/Priiloader",
+  };
+  unsigned int i;
+  for (i = 0; i < sizeof(paths) / sizeof(paths[0]); i++) {
+    DIR *d = opendir(paths[i]);
+    if (d) {
+      closedir(d);
+      return true;
+    }
   }
   return false;
+}
+
+/*
+ * Priiloader installs to NAND by adding a modified system menu .app;
+ * the original is often backed up as 1000000XX.app in the title content dir.
+ * Try multiple regions and content IDs. ISFS init/deinit here (NAND health may run later).
+ */
+static const char *priiloader_nand_paths[] = {
+  "/title/00000001/00000002/content/10000001.app", /* Americas */
+  "/title/00000001/00000002/content/10000002.app",
+  "/title/00000001/00000004/content/10000001.app", /* EU */
+  "/title/00000001/00000004/content/10000002.app",
+  "/title/00000001/00000008/content/10000001.app", /* JP */
+  "/title/00000001/00000008/content/10000002.app",
+  "/title/00000001/00000010/content/10000001.app", /* Korea */
+};
+
+static bool detect_priiloader_nand(void) {
+  s32 ret = ISFS_Initialize();
+  if (ret < 0)
+    return false;
+  unsigned int i;
+  for (i = 0; i < sizeof(priiloader_nand_paths) / sizeof(priiloader_nand_paths[0]); i++) {
+    s32 fd = ISFS_Open(priiloader_nand_paths[i], ISFS_OPEN_READ);
+    if (fd >= 0) {
+      ISFS_Close(fd);
+      ISFS_Deinitialize();
+      return true;
+    }
+  }
+  ISFS_Deinitialize();
+  return false;
+}
+
+/* Combined: NAND install (best) or app folder on current SD/USB. */
+static bool detect_priiloader(void) {
+  if (detect_priiloader_folder())
+    return true;
+  return detect_priiloader_nand();
 }
 
 static bool detect_bootmii_ios(void) {
@@ -46,6 +89,56 @@ static bool detect_bootmii_ios(void) {
   if (ES_GetStoredTMDSize(tid_236, &tmd_size) >= 0 && tmd_size > 0)
     return true;
   return false;
+}
+
+/*
+ * BootMii-as-boot2 compatibility is determined by boot1 (boot1a/b = yes, boot1c/d = no).
+ * Read OTP boot1 hash via Hollywood registers when PPC has AHBPROT (e.g. launched from HBC).
+ * Returns: 1 = compatible (boot1a/b), 0 = not compatible (boot1c/d), 2 = unknown hash, -1 = OTP not readable.
+ */
+/* PPC Hollywood regs: 0xCD000000 maps to 0x0D000000 (Wii map); 0x0D0xxx mirrors 0x0D8xxx for OTP */
+#define HW_REG_BASE_PHYS  0xCD000000
+#define HW_AHBPROT_OFF    0x064
+#define HW_OTPCMD_OFF     0x1ec
+#define HW_OTPDATA_OFF    0x1f0
+#define OTP_RD_BIT        (1U << 31)
+
+/* Known boot1 SHA1 hashes (20 bytes each) from WiiBrew Boot1 page */
+static const u8 boot1a_hash[20] = {
+  0xb3,0x0c,0x32,0xb9,0x62,0xc7,0xcd,0x08,0xab,0xe3,0x3d,0x01,0x5b,0x9b,0x8b,0x1d,0xb1,0x09,0x75,0x44
+};
+static const u8 boot1b_hash[20] = {
+  0xef,0x3e,0xf7,0x81,0x09,0x60,0x8d,0x56,0xdf,0x56,0x79,0xa6,0xf9,0x2e,0x13,0xf7,0x8b,0xbd,0xdf,0xdf
+};
+static const u8 boot1c_hash[20] = {
+  0xd2,0x20,0xc8,0xa4,0x86,0xc6,0x31,0xd0,0xdf,0x5a,0xdb,0x31,0x96,0xec,0xbc,0x66,0x87,0x80,0xcc,0x8d
+};
+static const u8 boot1d_hash[20] = {
+  0xf7,0x93,0x06,0x8a,0x09,0xe8,0x09,0x86,0xe2,0xa0,0x23,0xc0,0xc2,0x3f,0x06,0x14,0x0e,0xd1,0x69,0x74
+};
+
+static int get_boot1_bootmii_compatible(void) {
+  volatile u32 *hw = (volatile u32 *)HW_REG_BASE_PHYS;
+  u32 ahb = hw[HW_AHBPROT_OFF / 4];
+  /* PPCKERN (bit 31) = PPC full access to Hollywood regs; need it to read OTP */
+  if (!(ahb & OTP_RD_BIT))
+    return -1;
+  /* Read OTP words 0-4 (boot1 hash, 20 bytes). RD=1, ADDR=word index */
+  u8 hash[20];
+  unsigned int i;
+  for (i = 0; i < 5; i++) {
+    hw[HW_OTPCMD_OFF / 4] = OTP_RD_BIT | i;
+    u32 word = hw[HW_OTPDATA_OFF / 4];
+    hash[i * 4 + 0] = (u8)(word >> 24);
+    hash[i * 4 + 1] = (u8)(word >> 16);
+    hash[i * 4 + 2] = (u8)(word >> 8);
+    hash[i * 4 + 3] = (u8)word;
+  }
+  if (memcmp(hash, boot1a_hash, 20) == 0 || memcmp(hash, boot1b_hash, 20) == 0)
+    return 1;  /* compatible */
+  if (memcmp(hash, boot1c_hash, 20) == 0 || memcmp(hash, boot1d_hash, 20) == 0)
+    return 0;  /* not compatible */
+  return 2;    /* unknown */
 }
 
 /*---------------------------------------------------------------------------*/
@@ -156,6 +249,10 @@ void run_system_info(void) {
   snprintf(buf, sizeof(buf), "%u", device_id);
   ui_draw_kv("Device ID", buf);
 
+  /* Boot2 version: shown for reference. BootMii-as-boot2 compatibility is
+   * actually determined by boot1 revision (boot1a/b = can install, boot1c/d =
+   * cannot). Boot1 is not exposed by the system API; we use boot2 version as
+   * a proxy (v4 or lower ~ old boot1, v5+ ~ new boot1). */
   if (ret >= 0) {
     snprintf(buf, sizeof(buf), "v%u", boot2_version);
     ui_draw_kv("Boot2 Version", buf);
@@ -187,11 +284,14 @@ void run_system_info(void) {
   ui_draw_kv("GPU", "Hollywood (ATI/AMD)");
   ui_draw_kv("GPU Clock", "243 MHz (fixed)");
 
-  /* Brick Protection */
+  /* Brick Protection. BootMii (boot2): use boot1 from OTP when AHBPROT available,
+   * else fall back to boot2 version proxy. */
   ui_draw_section("Brick Protection");
   {
     bool has_priiloader = detect_priiloader();
-    bool has_bootmii_boot2 = (ret >= 0 && boot2_version <= 4);
+    int boot1_ok = get_boot1_bootmii_compatible();
+    bool boot2_suggests_bootmii_ok = (ret >= 0 && boot2_version <= 4);
+    bool has_bootmii_boot2 = (boot1_ok == 1) || (boot1_ok < 0 && boot2_suggests_bootmii_ok);
     bool has_bootmii_ios = detect_bootmii_ios();
     int protection_count = 0;
 
@@ -200,15 +300,29 @@ void run_system_info(void) {
       protection_count++;
     } else {
       ui_draw_kv_color("Priiloader", UI_BRED, "Not found");
+      ui_draw_info("If installed in NAND, add apps/priiloader to this SD/USB to detect");
     }
 
-    if (has_bootmii_boot2) {
+    if (boot1_ok == 1) {
       ui_draw_kv_color("BootMii (boot2)", UI_BGREEN,
-                       "Compatible (boot2 v4 or lower)");
+                       "Compatible (boot1a/b)");
       protection_count++;
-    } else {
+    } else if (boot1_ok == 0) {
       ui_draw_kv_color("BootMii (boot2)", UI_BYELLOW,
-                       "Not available (boot2 v5+)");
+                       "Not compatible (boot1c/d)");
+    } else if (boot1_ok == 2) {
+      ui_draw_kv_color("BootMii (boot2)", UI_BYELLOW,
+                       "Unknown boot1 revision");
+    } else {
+      if (boot2_suggests_bootmii_ok) {
+        ui_draw_kv_color("BootMii (boot2)", UI_BGREEN,
+                         "Likely compatible (boot2 v4-; OTP not readable)");
+        protection_count++;
+      } else {
+        ui_draw_kv_color("BootMii (boot2)", UI_BYELLOW,
+                         "Likely not (boot2 v5+; OTP not readable)");
+      }
+      ui_draw_info("Run from HBC for boot1 check; using boot2 as proxy");
     }
 
     if (has_bootmii_ios) {
@@ -249,8 +363,16 @@ void get_system_info_report(char *buf, int bufsize) {
 
   {
     bool has_priiloader = detect_priiloader();
-    bool has_bootmii_boot2 = (boot2_ret >= 0 && boot2_version <= 4);
+    int boot1_ok = get_boot1_bootmii_compatible();
+    bool boot2_suggests_ok = (boot2_ret >= 0 && boot2_version <= 4);
+    bool has_bootmii_boot2 = (boot1_ok == 1) || (boot1_ok < 0 && boot2_suggests_ok);
     bool has_bootmii_ios = detect_bootmii_ios();
+
+    const char *boot2_str;
+    if (boot1_ok == 1) boot2_str = "Compatible (boot1a/b)";
+    else if (boot1_ok == 0) boot2_str = "Not compatible (boot1c/d)";
+    else if (boot1_ok == 2) boot2_str = "Unknown boot1 revision";
+    else boot2_str = boot2_suggests_ok ? "Likely compatible (boot2 proxy)" : "Likely not (boot2 v5+)";
 
     {
       const char *rating = (has_priiloader && (has_bootmii_boot2 || has_bootmii_ios)) ? "GOOD"
@@ -281,7 +403,7 @@ void get_system_info_report(char *buf, int bufsize) {
                get_progressive_string(), hollywood_ver, device_id, boot2_version,
                ios_ver, ios_rev, mem1_size / 1024, mem2_size / 1024,
                has_priiloader ? "Installed" : "Not found",
-               has_bootmii_boot2 ? "Compatible" : "Not available (boot2 v5+)",
+               boot2_str,
                has_bootmii_ios ? "Installed" : "Not found",
                rating);
     }

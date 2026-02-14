@@ -41,6 +41,7 @@
 
 static char s_report[6144];
 static bool s_wifi_working = false;
+static bool s_wifi_driver_ok = false;  /* true if WD_Init + card info worked */
 static bool s_ip_obtained = false;
 static char s_ip_str[32] = "N/A";
 
@@ -298,6 +299,7 @@ void run_network_test(void) {
 
   memset(s_report, 0, sizeof(s_report));
   s_wifi_working = false;
+  s_wifi_driver_ok = false;
   s_ip_obtained = false;
   strcpy(s_ip_str, "N/A");
 
@@ -425,6 +427,7 @@ void run_network_test(void) {
       rpos += snprintf(s_report + rpos, sizeof(s_report) - rpos,
                        "WiFi Driver Init: FAILED\n");
     } else {
+      s_wifi_driver_ok = true;
       delay_vsyncs(30);
 
       /* --- WiFi Card Info --- */
@@ -439,10 +442,14 @@ void run_network_test(void) {
         ui_draw_kv("Firmware", (const char *)wdinfo.version);
 
         {
+          /* Only show as country code if both bytes are printable ASCII (e.g. US);
+           * otherwise driver may return garbage (e.g. "tç") when unset. */
           char cc[8];
-          snprintf(cc, sizeof(cc), "%c%c",
-                   wdinfo.CountryCode[0] ? wdinfo.CountryCode[0] : '?',
-                   wdinfo.CountryCode[1] ? wdinfo.CountryCode[1] : '?');
+          u8 c0 = wdinfo.CountryCode[0], c1 = wdinfo.CountryCode[1];
+          if (c0 >= 0x20 && c0 <= 0x7E && c1 >= 0x20 && c1 <= 0x7E)
+            snprintf(cc, sizeof(cc), "%c%c", c0, c1);
+          else
+            snprintf(cc, sizeof(cc), "??");
           ui_draw_kv("Country Code", cc);
         }
 
@@ -491,6 +498,9 @@ void run_network_test(void) {
 
         WD_SetDefaultScanParameters(&sparams);
         sparams.MaxChannelTime = 400;
+        /* Scan all 2.4 GHz channels (1-14); hotspots often use 5/6/7/9/10 which
+         * may be missing from the card's enabled-channel mask. */
+        sparams.ChannelBitmap = 0x3FFF; /* bits 0-13 = channels 1-14 */
         memset(scan_buf, 0, sizeof(scan_buf));
 
         scan_ret = WD_ScanOnce(&sparams, scan_buf, sizeof(scan_buf));
@@ -589,9 +599,14 @@ void run_network_test(void) {
     rpos += snprintf(s_report + rpos, sizeof(s_report) - rpos,
                      "\n=== NETWORK CONNECTIVITY ===\nWiFi Status: OK\n");
   } else {
-    rpos += snprintf(s_report + rpos, sizeof(s_report) - rpos,
-                     "\n=== NETWORK CONNECTIVITY ===\nWiFi Status: FAILED (error %d)\n",
-                     connectivity_ret);
+    if (connectivity_ret == -24)
+      rpos += snprintf(s_report + rpos, sizeof(s_report) - rpos,
+                       "\n=== NETWORK CONNECTIVITY ===\nWiFi Status: Not connected (error -24)\n"
+                       "  (normal when no connection is configured in Wii Settings)\n");
+    else
+      rpos += snprintf(s_report + rpos, sizeof(s_report) - rpos,
+                       "\n=== NETWORK CONNECTIVITY ===\nWiFi Status: FAILED (error %d)\n",
+                       connectivity_ret);
     if (connectivity_ret == -116)
       rpos += snprintf(s_report + rpos, sizeof(s_report) - rpos,
                        "  (error -116 = timeout / no response from router; AP scan still succeeded)\n");
@@ -612,7 +627,7 @@ void run_network_test(void) {
                         "Net Build:           " __DATE__ " " __TIME__ "\n"
                         "WiFi Module:         %s\n"
                         "IP Address:          %s\n\n",
-                        s_wifi_working ? "Working" : "Failed", s_ip_str);
+                        s_wifi_driver_ok ? "Working" : "Failed", s_ip_str);
 
     if (hlen + rpos < (int)sizeof(s_report)) {
       memmove(s_report + hlen, s_report, rpos + 1);

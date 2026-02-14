@@ -49,7 +49,7 @@ static void get_device_info(const char *device_name, const char *path) {
 
     while ((entry = readdir(dir)) != NULL) {
         struct stat st;
-        char fullpath[256];
+        char fullpath[512];
         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
             continue;
         snprintf(fullpath, sizeof(fullpath), "%s/%s", path, entry->d_name);

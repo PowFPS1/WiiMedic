@@ -314,6 +314,7 @@ void run_report_generator(void) {
     }
 
     if (!cancelled && save_path) {
+      char pathmsg[192];
       ui_draw_info("Saving report...");
       fp = fopen(save_path, "w");
       if (fp) {
@@ -322,8 +323,8 @@ void run_report_generator(void) {
 
         ui_draw_ok("Report saved successfully!");
 
-        snprintf(buf, sizeof(buf), "File: %s", save_path);
-        ui_draw_ok(buf);
+        snprintf(pathmsg, sizeof(pathmsg), "File: %s", save_path);
+        ui_draw_ok(pathmsg);
 
         snprintf(buf, sizeof(buf), "Size: %d bytes", (int)strlen(report));
         ui_draw_ok(buf);
@@ -334,8 +335,8 @@ void run_report_generator(void) {
             ui_draw_info("Previous report was replaced.");
           } else {
             ui_draw_info("Previous report was kept.");
-            snprintf(buf, sizeof(buf), "New report: %s", save_path);
-            ui_draw_info(buf);
+            snprintf(pathmsg, sizeof(pathmsg), "New report: %s", save_path);
+            ui_draw_info(pathmsg);
           }
         }
 

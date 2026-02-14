@@ -62,13 +62,17 @@ sFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))
 SFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.S)))
 BINFILES	:=	$(foreach dir,$(DATA),$(notdir $(wildcard $(dir)/*.*)))
 
+# Debug: Print the CFILES variable
+print-cfiles:
+	@echo CFILES: $(CFILES)
+
 #---------------------------------------------------------------------------------
 # use CXX for linking C++ projects, CC for standard C
 #---------------------------------------------------------------------------------
 ifeq ($(strip $(CPPFILES)),)
-	export LD	:=	$(CC)
+	export LD := $(CC)
 else
-	export LD	:=	$(CXX)
+	export LD := $(CXX)
 endif
 
 export OFILES_BIN	:=	$(addsuffix .o,$(BINFILES))
@@ -92,17 +96,30 @@ export LIBPATHS	:=	$(foreach dir,$(LIBDIRS),-L$(dir)/lib) \
 					-L$(LIBOGC_LIB)
 
 export OUTPUT	:=	$(CURDIR)/$(TARGET)
-.PHONY: $(BUILD) clean
+.PHONY: $(BUILD) clean install
+
+#---------------------------------------------------------------------------------
+# Install to E:\apps\WiiMedic (override: make install INSTALL_DIR=/f/apps/WiiMedic)
+#---------------------------------------------------------------------------------
+INSTALL_DIR	?=	/e/apps/WiiMedic
+
+install: $(BUILD)
+	@echo Installing to $(INSTALL_DIR) ...
+	@mkdir -p "$(INSTALL_DIR)"
+	@cp -v "$(OUTPUT).dol" "$(INSTALL_DIR)/boot.dol"
+	@cp -v "$(CURDIR)/meta.xml" "$(INSTALL_DIR)/"
+	@cp -v "$(CURDIR)/icon.png" "$(INSTALL_DIR)/"
+	@echo Done. WiiMedic is in $(INSTALL_DIR)
 
 #---------------------------------------------------------------------------------
 $(BUILD):
-	@[ -d $@ ] || mkdir -p $@
+	@[ -d $(BUILD) ] || mkdir -p $(BUILD)
 	@$(MAKE) --no-print-directory -C $(BUILD) -f "$(CURDIR)/Makefile"
 
 #---------------------------------------------------------------------------------
 clean:
 	@echo clean ...
-	@rm -fr $(BUILD) $(OUTPUT).elf $(OUTPUT).dol
+	@rm -rf $(BUILD) $(OUTPUT).elf $(OUTPUT).dol
 
 #---------------------------------------------------------------------------------
 run:
@@ -111,6 +128,9 @@ run:
 #---------------------------------------------------------------------------------
 else
 
+# Sub-make (in build/): use CC as linker (devkitPro uses gcc for linking)
+LD := $(CC)
+
 DEPENDS	:=	$(OFILES:.o=.d)
 
 #---------------------------------------------------------------------------------
@@ -118,6 +138,7 @@ DEPENDS	:=	$(OFILES:.o=.d)
 #---------------------------------------------------------------------------------
 $(OUTPUT).dol: $(OUTPUT).elf
 $(OUTPUT).elf: $(OFILES)
+	$(CC) -o $@ $(OFILES) $(LDFLAGS) $(LIBPATHS) $(LIBS)
 
 $(OFILES_SOURCES) : $(HFILES)
 

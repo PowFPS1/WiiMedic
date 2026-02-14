@@ -6,6 +6,9 @@
  * Order: connectivity first (net_init -> IP -> connection tests -> net_deinit),
  * then WiFi card info + AP scan (WD_Init in scan mode after network released).
  * This lets the driver be free for WD so AP scan can work without NCD lock.
+ *
+ * WiFi card info and AP scan implementation: thanks to Abdelali221 for help
+ * with the network code.
  */
 
 #include <errno.h>

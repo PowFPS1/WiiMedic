@@ -151,7 +151,7 @@ make
 | **D-Pad Up/Down** | Navigate menu |
 | **A Button** | Select / Confirm |
 | **B Button** | Return to menu (from sub-screen) |
-| **HOME** (Wii Remote) / **START** (GC Controller) | Exit to Homebrew Channel |
+| **HOME** (Wii Remote) / **START** (GC Controller) | Exit to Wii System Menu |
 
 Works with both **Wii Remote** and **GameCube Controller**.
 
@@ -197,6 +197,8 @@ People frequently post on r/WiiHacks and GBAtemp asking "is my Wii broken?" or "
 ## Changelog
 
 ### v1.1.0
+- **Brick Protection Check**: Detects Priiloader, BootMii (boot2), and BootMii (IOS) with a protection rating
+- **Refined Exit Logic**: HOME button now returns to System Menu; Menu option exits to HBC
 - WiFi Card Info: MAC address, firmware version, country code, enabled channels
 - WiFi AP Scanner: scans nearby access points (SSID, signal, channel, security)
 - Scrollable diagnostic screens (UP/DOWN line-by-line, LEFT/RIGHT page)
@@ -212,6 +214,7 @@ People frequently post on r/WiiHacks and GBAtemp asking "is my Wii broken?" or "
 
 ## Credits
 
+- Developed by **PowFPS1**
 - Built with [devkitPro](https://devkitpro.org/) / [libogc](https://github.com/devkitPro/libogc)
 - Inspired by the Wii homebrew community's need for better diagnostic tools
 - Thanks to the r/WiiHacks and GBAtemp communities

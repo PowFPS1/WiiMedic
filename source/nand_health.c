@@ -12,8 +12,8 @@
 #include "nand_health.h"
 #include "ui_common.h"
 
-/* NAND constants */
-#define NAND_TOTAL_CLUSTERS 2048
+/* NAND constants (Wii: 4096 blocks * 8 clusters/block = 32768 clusters) */
+#define NAND_TOTAL_CLUSTERS 32768
 #define NAND_TOTAL_INODES   6143
 
 /* State for report */
@@ -57,17 +57,19 @@ void run_nand_health(void) {
         return;
     }
 
-    /* Get NAND filesystem usage */
-    u32 used_bytes = 0, used_inodes = 0;
+    /* Get NAND filesystem usage (returns used clusters, used inodes) */
+    u32 used_clusters = 0, used_inodes = 0;
 
-    ret = ISFS_GetUsage("/", &used_bytes, &used_inodes);
+    ret = ISFS_GetUsage("/", &used_clusters, &used_inodes);
     if (ret >= 0) {
-        s_used_blocks  = used_bytes;
+        s_used_blocks  = used_clusters;
         s_used_inodes  = used_inodes;
     }
 
     s_free_inodes = NAND_TOTAL_INODES - s_used_inodes;
-    s_free_blocks = NAND_TOTAL_CLUSTERS - s_used_blocks;
+    s_free_blocks = (s_used_blocks <= NAND_TOTAL_CLUSTERS)
+                        ? (NAND_TOTAL_CLUSTERS - s_used_blocks)
+                        : 0;
 
     /* Storage usage */
     ui_draw_section("NAND Storage Usage");
@@ -78,7 +80,7 @@ void run_nand_health(void) {
         ui_draw_kv("Clusters Used", buf);
 
         snprintf(buf, sizeof(buf), "%u clusters (%.1f MB)", s_free_blocks,
-                 (float)s_free_blocks * 16.0f / 1024.0f);
+                 (float)s_free_blocks * 16.0f / 1024.0f);  /* 16 KB per cluster */
         ui_draw_kv("Clusters Free", buf);
     }
 

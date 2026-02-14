@@ -3,6 +3,7 @@
  * Displays comprehensive system hardware and firmware information
  */
 
+#include <dirent.h>
 #include <gccore.h>
 #include <malloc.h>
 #include <ogc/isfs.h>
@@ -11,7 +12,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-
 #include "system_info.h"
 #include "ui_common.h"
 
@@ -19,11 +19,15 @@
 /* Brick protection detection helpers                                        */
 /*---------------------------------------------------------------------------*/
 static bool detect_priiloader(void) {
-  /* Priiloader leaves loader.ini in the System Menu data directory */
-  s32 fd =
-      ISFS_Open("/title/00000001/00000002/data/loader.ini", ISFS_OPEN_READ);
-  if (fd >= 0) {
-    ISFS_Close(fd);
+  /* Priiloader uses /apps/priiloader/ on SD and USB for everyone. */
+  DIR *d = opendir("sd:/apps/priiloader");
+  if (d) {
+    closedir(d);
+    return true;
+  }
+  d = opendir("usb:/apps/priiloader");
+  if (d) {
+    closedir(d);
     return true;
   }
   return false;
@@ -238,40 +242,48 @@ void get_system_info_report(char *buf, int bufsize) {
   s32 ios_rev = IOS_GetRevision();
   u32 boot2_version = 0;
   u32 device_id = 0;
+  s32 boot2_ret;
 
-  ES_GetBoot2Version(&boot2_version);
+  boot2_ret = ES_GetBoot2Version(&boot2_version);
   ES_GetDeviceID(&device_id);
 
   {
     bool has_priiloader = detect_priiloader();
-    bool has_bootmii_boot2 = (boot2_version <= 4);
+    bool has_bootmii_boot2 = (boot2_ret >= 0 && boot2_version <= 4);
     bool has_bootmii_ios = detect_bootmii_ios();
 
-    snprintf(buf, bufsize,
-             "=== SYSTEM INFORMATION ===\n"
-             "Region:              %s\n"
-             "Video Standard:      %s\n"
-             "Language:            %s\n"
-             "Aspect Ratio:        %s\n"
-             "Progressive Scan:    %s\n"
-             "Hollywood Revision:  0x%08X\n"
-             "Device ID:           %u\n"
-             "Boot2 Version:       v%u\n"
-             "Running IOS:         IOS%d (rev %d)\n"
-             "MEM1 Arena Free:     %u KB\n"
-             "MEM2 Arena Free:     %u KB\n"
-             "\n"
-             "--- Brick Protection ---\n"
-             "Priiloader:          %s\n"
-             "BootMii (boot2):     %s\n"
-             "BootMii (IOS):       %s\n"
-             "\n",
-             get_region_string(), get_video_mode_string(),
-             get_language_string(), get_aspect_string(),
-             get_progressive_string(), hollywood_ver, device_id, boot2_version,
-             ios_ver, ios_rev, mem1_size / 1024, mem2_size / 1024,
-             has_priiloader ? "Installed" : "Not found",
-             has_bootmii_boot2 ? "Compatible" : "Not available (boot2 v5+)",
-             has_bootmii_ios ? "Installed" : "Not found");
+    {
+      const char *rating = (has_priiloader && (has_bootmii_boot2 || has_bootmii_ios)) ? "GOOD"
+                         : (has_priiloader || has_bootmii_ios || has_bootmii_boot2) ? "PARTIAL"
+                         : "NONE";
+      snprintf(buf, bufsize,
+               "=== SYSTEM INFORMATION ===\n"
+               "Region:              %s\n"
+               "Video Standard:      %s\n"
+               "Language:            %s\n"
+               "Aspect Ratio:        %s\n"
+               "Progressive Scan:    %s\n"
+               "Hollywood Revision:  0x%08X\n"
+               "Device ID:           %u\n"
+               "Boot2 Version:       v%u\n"
+               "Running IOS:         IOS%d (rev %d)\n"
+               "MEM1 Arena Free:     %u KB\n"
+               "MEM2 Arena Free:     %u KB\n"
+               "\n"
+               "--- Brick Protection ---\n"
+               "Priiloader:          %s\n"
+               "BootMii (boot2):     %s\n"
+               "BootMii (IOS):       %s\n"
+               "Protection Rating:   %s\n"
+               "\n",
+               get_region_string(), get_video_mode_string(),
+               get_language_string(), get_aspect_string(),
+               get_progressive_string(), hollywood_ver, device_id, boot2_version,
+               ios_ver, ios_rev, mem1_size / 1024, mem2_size / 1024,
+               has_priiloader ? "Installed" : "Not found",
+               has_bootmii_boot2 ? "Compatible" : "Not available (boot2 v5+)",
+               has_bootmii_ios ? "Installed" : "Not found",
+               rating);
+    }
   }
 }

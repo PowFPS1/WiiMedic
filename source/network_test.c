@@ -422,6 +422,10 @@ void run_network_test(void) {
     if (!wd_ready && WD_Init(0) == 0)
       wd_ready = true;
 
+    /* Deinit because WD_GetInfo & WD_ScanOnce
+       handle the initialization internally */
+    WD_Deinit();
+
     if (!wd_ready) {
       ui_draw_err("WiFi driver unavailable (WD_Init failed)");
       rpos += snprintf(s_report + rpos, sizeof(s_report) - rpos,
@@ -513,9 +517,6 @@ void run_network_test(void) {
 
         do_ap_scan(&rpos, scan_buf, scan_ret);
       }
-
-      /* Deinit only after all WD operations are done */
-      WD_Deinit();
     }
   }
 

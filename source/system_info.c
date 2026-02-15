@@ -15,6 +15,10 @@
 #include "system_info.h"
 #include "ui_common.h"
 
+#define SM_ID (u64)0x0000000100000002
+
+static u8 tmdbuff[MAX_SIGNED_TMD_SIZE] ATTRIBUTE_ALIGN(64);
+
 /*---------------------------------------------------------------------------*/
 /* Brick protection detection helpers                                        */
 /*---------------------------------------------------------------------------*/
@@ -42,30 +46,54 @@ static bool detect_priiloader_folder(void) {
  * the original is often backed up as 1000000XX.app in the title content dir.
  * Try multiple regions and content IDs. ISFS init/deinit here (NAND health may run later).
  */
-static const char *priiloader_nand_paths[] = {
-  "/title/00000001/00000002/content/10000001.app", /* Americas */
-  "/title/00000001/00000002/content/10000002.app",
-  "/title/00000001/00000004/content/10000001.app", /* EU */
-  "/title/00000001/00000004/content/10000002.app",
-  "/title/00000001/00000008/content/10000001.app", /* JP */
-  "/title/00000001/00000008/content/10000002.app",
-  "/title/00000001/00000010/content/10000001.app", /* Korea */
-};
+
+// Inspired by Priiloader, thanks DacoTaco
+
+static u32 get_SM_boot_content_id() {
+  u32 tmdsz = 0;
+  s32 ret = ES_GetStoredTMDSize(SM_ID, &tmdsz);
+
+  if(ret < 0) return false;
+
+  signed_blob* tmdblob = (signed_blob*)tmdbuff;
+
+  memset(tmdbuff, 0, tmdsz);
+
+  ret = ES_GetStoredTMD(SM_ID, tmdblob, tmdsz);
+
+  if(ret < 0) return false;
+
+  tmd* tmdptr = (tmd*)(SIGNATURE_PAYLOAD(tmdblob));
+
+  u32 id = 0;
+	for(u16 i = 0; i < tmdptr->num_contents; ++i)
+	{
+		if (tmdptr->contents[i].index == tmdptr->boot_index)
+		{
+			id = tmdptr->contents[i].cid;
+			break;
+		}
+	}
+
+  if(id == 0) return -1;
+  return id;
+}
 
 static bool detect_priiloader_nand(void) {
-  s32 ret = ISFS_Initialize();
+  char path[256];
+
+  sprintf(path, "/title/00000001/00000002/content/%x.app", get_SM_boot_content_id() + 0x10000000);
+
+  int ret = ISFS_Initialize();
   if (ret < 0)
     return false;
-  unsigned int i;
-  for (i = 0; i < sizeof(priiloader_nand_paths) / sizeof(priiloader_nand_paths[0]); i++) {
-    s32 fd = ISFS_Open(priiloader_nand_paths[i], ISFS_OPEN_READ);
-    if (fd >= 0) {
-      ISFS_Close(fd);
-      ISFS_Deinitialize();
-      return true;
-    }
+
+  s32 fd = ISFS_Open(path, ISFS_OPEN_READ);
+  if (fd >= 0) {
+    ISFS_Close(fd);
+    ISFS_Deinitialize();
+    return true;
   }
-  ISFS_Deinitialize();
   return false;
 }
 

@@ -163,19 +163,15 @@ After generating a report, the file is saved as `WiiMedic_Report.txt` in the roo
 
 1. Remove SD card from Wii and insert into PC
 2. Open `WiiMedic_Report.txt`
-3. Copy and paste the contents into a forum post, Reddit thread, or Discord message
+3. Copy and paste the contents into a forum post, Reddit thread, or Discord message, etc.
 4. The report contains NO personal information beyond your Wii's Device ID
 
 ---
 
 ## Technical Details
 
-- **Language:** C
-- **Toolchain:** devkitPPC (GCC for PowerPC)
 - **Libraries:** libogc, libfat, wiiuse, bte
-- **Target:** Nintendo Wii (Homebrew Channel)
 - **Output:** DOL executable
-- **Architecture:** PowerPC 750CL (Broadway)
 - **Compatibility:** All Wii models (RVL-001, RVL-101), Wii U vWii
 
 ---
@@ -220,3 +216,4 @@ People frequently post on r/WiiHacks and GBAtemp asking "is my Wii broken?" or "
 - Inspired by the Wii homebrew community's need for better diagnostic tools
 
 - Thanks to the r/WiiHacks and GBAtemp communities
+

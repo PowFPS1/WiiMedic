@@ -7,12 +7,12 @@
 #include <gccore.h>
 #include <malloc.h>
 #include <ogc/lwp_watchdog.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <wiiuse/wpad.h>
-
 
 #include "controller_test.h"
 #include "ios_check.h"
@@ -23,10 +23,38 @@
 #include "system_info.h"
 #include "ui_common.h"
 
-
-#define REPORT_MAX_SIZE 32768
+/* Increased to 64KB to handle detailed IOS/NAND lists without truncation */
+#define REPORT_MAX_SIZE 65536
 #define REPORT_PATH_SD "sd:/WiiMedic_Report.txt"
 #define REPORT_PATH_USB "usb:/WiiMedic_Report.txt"
+
+/*---------------------------------------------------------------------------*/
+/* Helper to append text to the report buffer safely.
+   Prevents buffer overflows and tracks the current position. */
+static void report_append(char *buffer, int *pos, int max_size, const char *fmt,
+                          ...) {
+  if (*pos >= max_size - 1)
+    return; /* Buffer full */
+
+  va_list args;
+  va_start(args, fmt);
+
+  /* vsnprintf returns the number of characters that WOULD have been written */
+  int remaining = max_size - *pos;
+  int written = vsnprintf(buffer + *pos, remaining, fmt, args);
+
+  va_end(args);
+
+  if (written > 0) {
+    if (written >= remaining) {
+      /* Truncation occurred, buffer is now full */
+      *pos = max_size - 1;
+      buffer[*pos] = '\0'; /* Ensure null termination */
+    } else {
+      *pos += written;
+    }
+  }
+}
 
 /*---------------------------------------------------------------------------*/
 /* Check if a report file exists at the given path, return its size or -1 */
@@ -103,7 +131,7 @@ static int ask_existing_report_action(const char *path, long size) {
       printf(UI_WHITE "      [3] Cancel - go back to menu\n" UI_RESET);
 
     printf("\n" UI_WHITE " ----------------------------------------------------"
-                         "------\n" UI_RESET);
+           "------\n" UI_RESET);
     printf(UI_WHITE " [UP/DOWN] Choose   [A] Confirm\n" UI_RESET);
 
     while (1) {
@@ -162,8 +190,8 @@ void run_report_generator(void) {
   memset(report, 0, REPORT_MAX_SIZE);
 
   /* Header */
-  pos += snprintf(
-      report + pos, REPORT_MAX_SIZE - pos,
+  report_append(
+      report, &pos, REPORT_MAX_SIZE,
       "==========================================================\n"
       "     WiiMedic Diagnostic Report v" WIIMEDIC_VERSION "\n"
       "==========================================================\n\n"
@@ -176,38 +204,28 @@ void run_report_generator(void) {
                      " Collecting system information...\n" UI_RESET);
   memset(section, 0, sizeof(section));
   get_system_info_report(section, sizeof(section));
-  pos += snprintf(report + pos, REPORT_MAX_SIZE - pos, "%s", section);
+  report_append(report, &pos, REPORT_MAX_SIZE, "%s", section);
   ui_draw_ok("Done.");
 
-  /* 2: NAND Health (run full check so report has fresh data and correct cluster count) */
+  /* 2: NAND Health */
   ui_printf(UI_BCYAN "   [2/6]" UI_WHITE " Scanning NAND health...\n" UI_RESET);
   run_nand_health();
   memset(section, 0, sizeof(section));
   get_nand_health_report(section, sizeof(section));
-  pos += snprintf(report + pos, REPORT_MAX_SIZE - pos, "%s", section);
+  report_append(report, &pos, REPORT_MAX_SIZE, "%s", section);
   ui_draw_ok("Done.");
 
   /* 3: IOS Check */
   ui_printf(UI_BCYAN "   [3/6]" UI_WHITE
                      " Scanning IOS installations...\n" UI_RESET);
-  {
-    u32 title_count = 0;
-    ES_GetNumTitles(&title_count);
-    if (title_count > 0) {
-      u64 *tlist = (u64 *)memalign(32, title_count * sizeof(u64));
-      if (tlist) {
-        ES_GetTitles(tlist, title_count);
-        free(tlist);
-      }
-    }
-  }
+  /* Redundant memory alloc removed here - get_ios_check_report handles it */
   memset(section, 0, sizeof(section));
   get_ios_check_report(section, sizeof(section));
   if (strlen(section) > 0) {
-    pos += snprintf(report + pos, REPORT_MAX_SIZE - pos, "%s", section);
+    report_append(report, &pos, REPORT_MAX_SIZE, "%s", section);
   } else {
-    pos += snprintf(
-        report + pos, REPORT_MAX_SIZE - pos,
+    report_append(
+        report, &pos, REPORT_MAX_SIZE,
         "=== IOS INSTALLATION SCAN ===\n"
         "Run IOS Scan from main menu first to populate this section.\n\n");
   }
@@ -219,10 +237,10 @@ void run_report_generator(void) {
   memset(section, 0, sizeof(section));
   get_storage_test_report(section, sizeof(section));
   if (strlen(section) > 0) {
-    pos += snprintf(report + pos, REPORT_MAX_SIZE - pos, "%s", section);
+    report_append(report, &pos, REPORT_MAX_SIZE, "%s", section);
   } else {
-    pos += snprintf(
-        report + pos, REPORT_MAX_SIZE - pos,
+    report_append(
+        report, &pos, REPORT_MAX_SIZE,
         "=== STORAGE TEST ===\n"
         "Run Storage Test from main menu first to populate this section.\n\n");
   }
@@ -233,32 +251,31 @@ void run_report_generator(void) {
   scan_controllers_quick();
   memset(section, 0, sizeof(section));
   get_controller_test_report(section, sizeof(section));
-  pos += snprintf(report + pos, REPORT_MAX_SIZE - pos, "%s", section);
+  report_append(report, &pos, REPORT_MAX_SIZE, "%s", section);
   ui_draw_ok("Done.");
 
-  /* 6: Network (run test so report reflects current state) */
+  /* 6: Network */
   ui_printf(UI_BCYAN "   [6/6]" UI_WHITE " Checking network...\n" UI_RESET);
   run_network_test();
   memset(section, 0, sizeof(section));
   get_network_test_report(section, sizeof(section));
   if (strlen(section) > 0) {
-    pos += snprintf(report + pos, REPORT_MAX_SIZE - pos, "%s", section);
+    report_append(report, &pos, REPORT_MAX_SIZE, "%s", section);
   } else {
-    pos += snprintf(
-        report + pos, REPORT_MAX_SIZE - pos,
+    report_append(
+        report, &pos, REPORT_MAX_SIZE,
         "=== NETWORK TEST ===\n"
         "Run Network Test from main menu first to populate this section.\n\n");
   }
   ui_draw_ok("Done.");
 
   /* Footer */
-  pos +=
-      snprintf(report + pos, REPORT_MAX_SIZE - pos,
-               "----------------------------------------------------------\n"
-               "END OF WIIMEDIC DIAGNOSTIC REPORT\n"
-               "For best results, run each module from the main menu first,\n"
-               "then generate this report to capture all data.\n"
-               "----------------------------------------------------------\n");
+  report_append(report, &pos, REPORT_MAX_SIZE,
+                "----------------------------------------------------------\n"
+                "END OF WIIMEDIC DIAGNOSTIC REPORT\n"
+                "For best results, run each module from the main menu first,\n"
+                "then generate this report to capture all data.\n"
+                "----------------------------------------------------------\n");
 
   /* Check for existing reports and ask user */
   ui_printf("\n");
@@ -276,11 +293,11 @@ void run_report_generator(void) {
     if (existing_sd >= 0) {
       existing = existing_sd;
       save_path = REPORT_PATH_SD;
-      base_dir = "sd:";
+      base_dir = "sd:/";
     } else if (existing_usb >= 0) {
       existing = existing_usb;
       save_path = REPORT_PATH_USB;
-      base_dir = "usb:";
+      base_dir = "usb:/";
     }
 
     if (existing >= 0) {

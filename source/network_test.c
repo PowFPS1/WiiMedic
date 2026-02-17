@@ -41,7 +41,7 @@
 
 static char s_report[6144];
 static bool s_wifi_working = false;
-static bool s_wifi_driver_ok = false;  /* true if WD_Init + card info worked */
+static bool s_wifi_driver_ok = false; /* true if WD_Init + card info worked */
 static bool s_ip_obtained = false;
 static char s_ip_str[32] = "N/A";
 
@@ -279,8 +279,8 @@ static int do_ap_scan(int *rpos_ptr, u8 *scan_buf, s32 scan_ret) {
 
   if (scan_count == 0) {
     ui_draw_warn("No access points found");
-    rpos += snprintf(s_report + rpos, sizeof(s_report) - rpos,
-                     "  (none found)\n");
+    rpos +=
+        snprintf(s_report + rpos, sizeof(s_report) - rpos, "  (none found)\n");
   } else {
     char cnt[64];
     snprintf(cnt, sizeof(cnt), "Found %d access point(s)", scan_count);
@@ -417,14 +417,11 @@ void run_network_test(void) {
     bool wd_ready = false;
 
     /* Try scan mode first (AOSSAPScan), then normal (0) */
+    /* Initial driver probe */
     if (WD_Init(AOSSAPScan) == 0)
       wd_ready = true;
     if (!wd_ready && WD_Init(0) == 0)
       wd_ready = true;
-
-    /* Deinit because WD_GetInfo & WD_ScanOnce
-       handle the initialization internally */
-    WD_Deinit();
 
     if (!wd_ready) {
       ui_draw_err("WiFi driver unavailable (WD_Init failed)");
@@ -432,6 +429,7 @@ void run_network_test(void) {
                        "WiFi Driver Init: FAILED\n");
     } else {
       s_wifi_driver_ok = true;
+      /* Do NOT deinit yet - we need it for GetInfo and ScanOnce */
       delay_vsyncs(30);
 
       /* --- WiFi Card Info --- */
@@ -446,8 +444,8 @@ void run_network_test(void) {
         ui_draw_kv("Firmware", (const char *)wdinfo.version);
 
         {
-          /* Only show as country code if both bytes are printable ASCII (e.g. US);
-           * otherwise driver may return garbage (e.g. "tç") when unset. */
+          /* Only show as country code if both bytes are printable ASCII (e.g.
+           * US); otherwise driver may return garbage (e.g. "tç") when unset. */
           char cc[8];
           u8 c0 = wdinfo.CountryCode[0], c1 = wdinfo.CountryCode[1];
           if (c0 >= 0x20 && c0 <= 0x7E && c1 >= 0x20 && c1 <= 0x7E)
@@ -467,8 +465,8 @@ void run_network_test(void) {
         for (ci = 1; ci <= 14; ci++) {
           if (wdinfo.EnableChannelsMask & (1 << (ci - 1))) {
             if (ch_pos > 0)
-              ch_pos += snprintf(chan_buf + ch_pos, sizeof(chan_buf) - ch_pos,
-                                 ", ");
+              ch_pos +=
+                  snprintf(chan_buf + ch_pos, sizeof(chan_buf) - ch_pos, ", ");
             ch_pos += snprintf(chan_buf + ch_pos, sizeof(chan_buf) - ch_pos,
                                "%d", ci);
           }
@@ -483,8 +481,8 @@ void run_network_test(void) {
                          "Firmware:            %s\n"
                          "Current Channel:     %d\n"
                          "Enabled Channels:    %s\n",
-                         mac_str, (const char *)wdinfo.version,
-                         wdinfo.channel, chan_buf);
+                         mac_str, (const char *)wdinfo.version, wdinfo.channel,
+                         chan_buf);
       } else {
         ui_draw_err("Failed to read WiFi card info");
         rpos += snprintf(s_report + rpos, sizeof(s_report) - rpos,
@@ -545,7 +543,8 @@ void run_network_test(void) {
             ui_draw_ok("Valid private IP range (192.168.x.x)");
           else if (first_octet == 10)
             ui_draw_ok("Valid private IP range (10.x.x.x)");
-          else if (first_octet == 172 && second_octet >= 16 && second_octet <= 31)
+          else if (first_octet == 172 && second_octet >= 16 &&
+                   second_octet <= 31)
             ui_draw_ok("Valid private IP range (172.16-31.x.x)");
           else if (first_octet == 169 && second_octet == 254)
             ui_draw_warn("Link-local IP (169.254.x.x) - DHCP may have failed");
@@ -587,7 +586,8 @@ void run_network_test(void) {
         ui_draw_warn(retry_msg);
       }
       if (ret == -24) {
-        ui_draw_info("Set up WiFi in Wii Settings -> Internet -> Connection Settings");
+        ui_draw_info(
+            "Set up WiFi in Wii Settings -> Internet -> Connection Settings");
         ui_draw_info("and run the connection test there.");
       } else if (ret == -116) {
         ui_draw_info("Error -116: timeout or no response from router.");
@@ -601,16 +601,20 @@ void run_network_test(void) {
                      "\n=== NETWORK CONNECTIVITY ===\nWiFi Status: OK\n");
   } else {
     if (connectivity_ret == -24)
-      rpos += snprintf(s_report + rpos, sizeof(s_report) - rpos,
-                       "\n=== NETWORK CONNECTIVITY ===\nWiFi Status: Not connected (error -24)\n"
-                       "  (normal when no connection is configured in Wii Settings)\n");
+      rpos += snprintf(
+          s_report + rpos, sizeof(s_report) - rpos,
+          "\n=== NETWORK CONNECTIVITY ===\nWiFi Status: Not connected (error "
+          "-24)\n"
+          "  (normal when no connection is configured in Wii Settings)\n");
     else
-      rpos += snprintf(s_report + rpos, sizeof(s_report) - rpos,
-                       "\n=== NETWORK CONNECTIVITY ===\nWiFi Status: FAILED (error %d)\n",
-                       connectivity_ret);
+      rpos += snprintf(
+          s_report + rpos, sizeof(s_report) - rpos,
+          "\n=== NETWORK CONNECTIVITY ===\nWiFi Status: FAILED (error %d)\n",
+          connectivity_ret);
     if (connectivity_ret == -116)
       rpos += snprintf(s_report + rpos, sizeof(s_report) - rpos,
-                       "  (error -116 = timeout / no response from router; AP scan still succeeded)\n");
+                       "  (error -116 = timeout / no response from router; AP "
+                       "scan still succeeded)\n");
   }
 
   /* Tips */

@@ -6,6 +6,7 @@
 #include <fat.h>
 #include <gccore.h>
 #include <malloc.h>
+#include <network.h>
 #include <ogc/lwp_watchdog.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -254,9 +255,21 @@ void run_report_generator(void) {
   report_append(report, &pos, REPORT_MAX_SIZE, "%s", section);
   ui_draw_ok("Done.");
 
-  /* 6: Network */
-  ui_printf(UI_BCYAN "   [6/6]" UI_WHITE " Checking network...\n" UI_RESET);
-  run_network_test();
+  /* 6: Network (Option 4: Cache result if already run) */
+  if (has_network_test_run()) {
+    ui_printf(UI_BCYAN "   [6/6] " UI_WHITE
+                       "Network: Using cached results\n" UI_RESET);
+  } else {
+    ui_printf(UI_BCYAN "   [6/6] " UI_WHITE "Checking network...\n" UI_RESET);
+    /* Cooldown to let IOS settle after intensive NAND/IOS scans */
+    net_deinit();
+    {
+      int i;
+      for (i = 0; i < 60; i++)
+        VIDEO_WaitVSync();
+    }
+    run_network_test();
+  }
   memset(section, 0, sizeof(section));
   get_network_test_report(section, sizeof(section));
   if (strlen(section) > 0) {

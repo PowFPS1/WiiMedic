@@ -16,6 +16,7 @@
 #include <network.h>
 #include <ogc/lwp_watchdog.h>
 #include <ogc/wd.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -39,11 +40,22 @@
 #define AOSSAPScan 3
 #endif
 
-static char s_report[6144];
+static char s_report[8192];
 static bool s_wifi_working = false;
 static bool s_wifi_driver_ok = false; /* true if WD_Init + card info worked */
 static bool s_ip_obtained = false;
 static char s_ip_str[32] = "N/A";
+static bool s_test_done = false;
+static bool s_wdinfo_valid = false;
+
+/* Aligned buffers for IOS/Hardware IPC - Added padding to prevent aliasing */
+static u8 s_wd_guard1[64] __attribute__((aligned(32)));
+static WDInfo s_wdinfo __attribute__((aligned(32)));
+static u8 s_wd_guard2[64] __attribute__((aligned(32)));
+static u8 s_scan_buf[SCAN_BUF_SIZE] __attribute__((aligned(32)));
+
+/*---------------------------------------------------------------------------*/
+bool has_network_test_run(void) { return s_test_done; }
 
 /*---------------------------------------------------------------------------*/
 static void ip_to_str(u32 ip, char *buf) {
@@ -298,19 +310,23 @@ void run_network_test(void) {
   s32 connectivity_ret = 0; /* used for report if connectivity never succeeds */
 
   memset(s_report, 0, sizeof(s_report));
+  memset(&s_wdinfo, 0, sizeof(s_wdinfo));
+  memset(s_scan_buf, 0, sizeof(s_scan_buf));
   s_wifi_working = false;
-  s_wifi_driver_ok = false;
   s_ip_obtained = false;
+  s_wdinfo_valid = false;
   strcpy(s_ip_str, "N/A");
 
-  /* ======================================================================
-   * PART 1: Network Connectivity (run first, then release driver)
-   * ====================================================================== */
+  /* Write header with fixed-width placeholders (patched later with memcpy) */
+  rpos += snprintf(s_report + rpos, sizeof(s_report) - rpos,
+                   "=== NETWORK TEST ===\n"
+                   "Net Build:           " __DATE__ " " __TIME__ "\n"
+                   "WiFi Module:         Searching...   \n"
+                   "IP Address:          Searching...   \n\n");
 
-  ui_draw_section("Network Connectivity");
-  ui_draw_info("Initializing network interface...");
-  ui_draw_info("This may take up to 15 seconds...");
-  ui_printf("\n");
+  /* Clean state for network module */
+  net_deinit();
+  delay_vsyncs(30);
 
   ret = net_init();
 
@@ -331,15 +347,14 @@ void run_network_test(void) {
     case -24:
       ui_draw_warn("No connection (error -24)");
       ui_draw_info("Wii Settings -> Internet -> Connection Settings");
-      ui_draw_info("Set up a connection and run the connection test there.");
       break;
     case -116:
       ui_draw_warn("Connection failed (error -116)");
       ui_draw_info("Timeout or no response from router.");
-      ui_draw_info("Check signal strength and try again.");
+      ui_draw_info("Hotspots may require 2.4GHz and WPA2.");
       break;
     default:
-      ui_draw_warn("WiFi module may be damaged or not configured");
+      ui_draw_warn("WiFi module status unknown");
       break;
     }
     net_deinit();
@@ -411,16 +426,14 @@ void run_network_test(void) {
   ui_printf("\n");
 
   {
-    WDInfo wdinfo;
-    char mac_str[20];
-    char chan_buf[128];
+    char mac_str[32];
+    char chan_buf[256];
     bool wd_ready = false;
 
-    /* Try scan mode first (AOSSAPScan), then normal (0) */
-    /* Initial driver probe */
-    if (WD_Init(AOSSAPScan) == 0)
+    /* Initial driver probe: Use mode 0 first for hardware info retrieval */
+    if (WD_Init(0) == 0)
       wd_ready = true;
-    if (!wd_ready && WD_Init(0) == 0)
+    if (!wd_ready && WD_Init(AOSSAPScan) == 0)
       wd_ready = true;
 
     if (!wd_ready) {
@@ -429,100 +442,130 @@ void run_network_test(void) {
                        "WiFi Driver Init: FAILED\n");
     } else {
       s_wifi_driver_ok = true;
-      /* Do NOT deinit yet - we need it for GetInfo and ScanOnce */
       delay_vsyncs(30);
 
       /* --- WiFi Card Info --- */
-      memset(&wdinfo, 0, sizeof(wdinfo));
-      if (WD_GetInfo(&wdinfo) == 0) {
+      memset(&s_wdinfo, 0, sizeof(s_wdinfo));
+      if (WD_GetInfo(&s_wdinfo) == 0) {
         int ci, ch_pos = 0;
 
-        mac_to_str(wdinfo.MAC, mac_str);
-        ui_draw_kv("MAC Address", mac_str);
-
-        wdinfo.version[sizeof(wdinfo.version) - 1] = '\0';
-        ui_draw_kv("Firmware", (const char *)wdinfo.version);
-
-        {
-          /* Only show as country code if both bytes are printable ASCII (e.g.
-           * US); otherwise driver may return garbage (e.g. "tç") when unset. */
-          char cc[8];
-          u8 c0 = wdinfo.CountryCode[0], c1 = wdinfo.CountryCode[1];
-          if (c0 >= 0x20 && c0 <= 0x7E && c1 >= 0x20 && c1 <= 0x7E)
-            snprintf(cc, sizeof(cc), "%c%c", c0, c1);
-          else
-            snprintf(cc, sizeof(cc), "??");
-          ui_draw_kv("Country Code", cc);
-        }
-
-        {
-          char ch_str[8];
-          snprintf(ch_str, sizeof(ch_str), "%d", wdinfo.channel);
-          ui_draw_kv("Current Channel", ch_str);
-        }
-
-        chan_buf[0] = '\0';
-        for (ci = 1; ci <= 14; ci++) {
-          if (wdinfo.EnableChannelsMask & (1 << (ci - 1))) {
-            if (ch_pos > 0)
-              ch_pos +=
-                  snprintf(chan_buf + ch_pos, sizeof(chan_buf) - ch_pos, ", ");
-            ch_pos += snprintf(chan_buf + ch_pos, sizeof(chan_buf) - ch_pos,
-                               "%d", ci);
+        bool mac_ok = false;
+        int i;
+        for (i = 0; i < 6; i++) {
+          if (s_wdinfo.MAC[i] != 0 && s_wdinfo.MAC[i] != 0xFF) {
+            mac_ok = true;
+            break;
           }
         }
-        if (ch_pos > 0)
-          ui_draw_kv("Enabled Channels", chan_buf);
 
-        ui_draw_ok("WiFi card info retrieved");
+        if (mac_ok && s_wdinfo.channel >= 1 && s_wdinfo.channel <= 14) {
+          s_wdinfo_valid = true;
+          mac_to_str(s_wdinfo.MAC, mac_str);
+          ui_draw_kv("MAC Address", mac_str);
 
-        rpos += snprintf(s_report + rpos, sizeof(s_report) - rpos,
-                         "MAC Address:         %s\n"
-                         "Firmware:            %s\n"
-                         "Current Channel:     %d\n"
-                         "Enabled Channels:    %s\n",
-                         mac_str, (const char *)wdinfo.version, wdinfo.channel,
-                         chan_buf);
+          /* Safety: ensure version is a clean string */
+          s_wdinfo.version[sizeof(s_wdinfo.version) - 1] = '\0';
+          for (ci = 0; ci < (int)sizeof(s_wdinfo.version); ci++) {
+            u8 c = s_wdinfo.version[ci];
+            if (c == 0)
+              break;
+            if (c < 0x20 || c > 0x7E)
+              s_wdinfo.version[ci] = '?'; /* Mask garbage */
+          }
+          ui_draw_kv("Firmware", (const char *)s_wdinfo.version);
+
+          {
+            /* Only show as country code if both bytes are printable ASCII */
+            char cc[8];
+            u8 c0 = s_wdinfo.CountryCode[0], c1 = s_wdinfo.CountryCode[1];
+            if (c0 >= 0x20 && c0 <= 0x7E && c1 >= 0x20 && c1 <= 0x7E)
+              snprintf(cc, sizeof(cc), "%c%c", c0, c1);
+            else
+              snprintf(cc, sizeof(cc), "??");
+            ui_draw_kv("Country Code", cc);
+          }
+
+          {
+            char ch_str[8];
+            snprintf(ch_str, sizeof(ch_str), "%d", s_wdinfo.channel);
+            ui_draw_kv("Current Channel", ch_str);
+          }
+
+          chan_buf[0] = '\0';
+          for (ci = 1; ci <= 14; ci++) {
+            if (s_wdinfo.EnableChannelsMask & (1 << (ci - 1))) {
+              if (ch_pos > 0)
+                ch_pos += snprintf(chan_buf + ch_pos, sizeof(chan_buf) - ch_pos,
+                                   ", ");
+              ch_pos += snprintf(chan_buf + ch_pos, sizeof(chan_buf) - ch_pos,
+                                 "%d", ci);
+            }
+          }
+          if (ch_pos > 0)
+            ui_draw_kv("Enabled Channels", chan_buf);
+
+          ui_draw_ok("WiFi card info retrieved");
+
+          rpos += snprintf(s_report + rpos, sizeof(s_report) - rpos,
+                           "MAC Address:         %s\n"
+                           "Firmware:            %s\n"
+                           "Current Channel:     %d\n"
+                           "Enabled Channels:    %s\n",
+                           mac_str, (const char *)s_wdinfo.version,
+                           s_wdinfo.channel, chan_buf);
+        } else {
+          ui_draw_warn("WiFi card info invalid or uninitialized");
+          rpos += snprintf(s_report + rpos, sizeof(s_report) - rpos,
+                           "WiFi Card Info:      READ FAILED (Invalid data)\n");
+          /* s_wifi_driver_ok stays true; we just mark the data as failed */
+        }
       } else {
         ui_draw_err("Failed to read WiFi card info");
         rpos += snprintf(s_report + rpos, sizeof(s_report) - rpos,
                          "WiFi Card Info:      FAILED\n");
       }
 
-      /* --- AP Scan (WD still initialized; no early WD_Deinit) --- */
+      /* --- AP Scan: Re-init with AOSSAPScan if needed --- */
       ui_draw_section("WiFi AP Scan");
       ui_draw_info("Scanning for nearby access points...");
 
+      /* Some IOS versions need AOSSAPScan mode specifically for ScanOnce */
+      WD_Deinit();
+      delay_vsyncs(30);
+      WD_Init(AOSSAPScan);
+
       {
-        static u8 scan_buf[SCAN_BUF_SIZE] ATTRIBUTE_ALIGN(32);
         ScanParameters sparams;
         s32 scan_ret;
 
         WD_SetDefaultScanParameters(&sparams);
         sparams.MaxChannelTime = 400;
-        /* Scan all 2.4 GHz channels (1-14); hotspots often use 5/6/7/9/10 which
-         * may be missing from the card's enabled-channel mask. */
-        sparams.ChannelBitmap = 0x3FFF; /* bits 0-13 = channels 1-14 */
-        memset(scan_buf, 0, sizeof(scan_buf));
+        sparams.ChannelBitmap = 0x3FFF;
+        memset(s_scan_buf, 0, sizeof(s_scan_buf));
 
-        scan_ret = WD_ScanOnce(&sparams, scan_buf, sizeof(scan_buf));
+        scan_ret = WD_ScanOnce(&sparams, s_scan_buf, sizeof(s_scan_buf));
 
         /* Retry once if first scan returned empty */
-        if (scan_ret >= 0 && scan_buf[0] == 0 && scan_buf[1] == 0) {
+        if (scan_ret >= 0 && s_scan_buf[0] == 0 && s_scan_buf[1] == 0) {
           delay_vsyncs(45);
-          scan_ret = WD_ScanOnce(&sparams, scan_buf, sizeof(scan_buf));
+          scan_ret = WD_ScanOnce(&sparams, s_scan_buf, sizeof(s_scan_buf));
         }
 
-        do_ap_scan(&rpos, scan_buf, scan_ret);
+        do_ap_scan(&rpos, s_scan_buf, scan_ret);
       }
+      /* IMPORTANT: Release WD driver so net_init can use the hardware again */
+      WD_Deinit();
+      delay_vsyncs(60);
     }
   }
 
-  /* Retry connectivity after WD released the driver (often fixes -24) */
+  /* Retry connectivity after WD released the driver (fixes -24 and -116) */
   if (!s_wifi_working) {
-    ui_draw_section("Network Connectivity (retry)");
-    ui_draw_info("Retrying... driver was released after scan.");
-    delay_vsyncs(90);
+    ui_draw_section("Network Connectivity (Final Attempt)");
+    ui_draw_info("Retrying after driver release...");
+    delay_vsyncs(60);
+    net_deinit();
+    delay_vsyncs(30);
     ret = net_init();
     if (ret >= 0) {
       s_wifi_working = true;
@@ -624,20 +667,20 @@ void run_network_test(void) {
   ui_draw_info("WPA3 and 5GHz networks are NOT supported");
   ui_draw_info("For Wiimmfi, ports 28910 and 29900-29901 must be open");
 
-  /* Report header */
+  /* Finalize header (patch placeholders with final status) */
   {
-    char hdr[512];
-    int hlen = snprintf(hdr, sizeof(hdr),
-                        "=== NETWORK TEST ===\n"
-                        "Net Build:           " __DATE__ " " __TIME__ "\n"
-                        "WiFi Module:         %s\n"
-                        "IP Address:          %s\n\n",
-                        s_wifi_driver_ok ? "Working" : "Failed", s_ip_str);
+    char *p = strstr(s_report, "Searching...   ");
+    if (p) {
+      char tmp[16];
+      snprintf(tmp, sizeof(tmp), "%-14s",
+               s_wifi_driver_ok ? "Working" : "Failed");
+      memcpy(p, tmp, 14); /* Overwrite without null terminator */
 
-    if (hlen + rpos < (int)sizeof(s_report)) {
-      memmove(s_report + hlen, s_report, rpos + 1);
-      memcpy(s_report, hdr, hlen);
-      rpos += hlen;
+      p = strstr(p + 14, "Searching...   ");
+      if (p) {
+        snprintf(tmp, sizeof(tmp), "%-14s", s_ip_str);
+        memcpy(p, tmp, 14);
+      }
     }
   }
 
@@ -645,6 +688,7 @@ void run_network_test(void) {
 
   ui_printf("\n");
   ui_draw_ok("Network test complete");
+  s_test_done = true;
 }
 
 /*---------------------------------------------------------------------------*/

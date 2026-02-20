@@ -14,6 +14,7 @@
 #include <errno.h>
 #include <gccore.h>
 #include <network.h>
+#include <ogc/lwp.h>
 #include <ogc/lwp_watchdog.h>
 #include <ogc/wd.h>
 #include <stdbool.h>
@@ -49,10 +50,21 @@ static bool s_test_done = false;
 static bool s_wdinfo_valid = false;
 
 /* Aligned buffers for IOS/Hardware IPC - Added padding to prevent aliasing */
-static u8 s_wd_guard1[64] __attribute__((aligned(32)));
+static u8 s_wd_guard1[64] __attribute__((aligned(32), unused));
 static WDInfo s_wdinfo __attribute__((aligned(32)));
-static u8 s_wd_guard2[64] __attribute__((aligned(32)));
+static u8 s_wd_guard2[64] __attribute__((aligned(32), unused));
 static u8 s_scan_buf[SCAN_BUF_SIZE] __attribute__((aligned(32)));
+
+static lwp_t s_net_thread;
+static u8 s_net_stack[8192] __attribute__((aligned(32)));
+static s32 s_net_ret;
+static volatile bool s_net_done;
+
+static void *net_init_thread_func(void *arg) {
+  s_net_ret = net_init();
+  s_net_done = true;
+  return NULL;
+}
 
 /*---------------------------------------------------------------------------*/
 bool has_network_test_run(void) { return s_test_done; }
@@ -320,15 +332,22 @@ void run_network_test(void) {
   /* Write header with fixed-width placeholders (patched later with memcpy) */
   rpos += snprintf(s_report + rpos, sizeof(s_report) - rpos,
                    "=== NETWORK TEST ===\n"
-                   "Net Build:           " __DATE__ " " __TIME__ "\n"
+                   "Net Build:           v%-14s\n"
                    "WiFi Module:         Searching...   \n"
-                   "IP Address:          Searching...   \n\n");
+                   "IP Address:          Searching...   \n\n",
+                   WIIMEDIC_VERSION);
 
   /* Clean state for network module */
   net_deinit();
   delay_vsyncs(30);
 
-  ret = net_init();
+  s_net_done = false;
+  LWP_CreateThread(&s_net_thread, net_init_thread_func, NULL, s_net_stack,
+                   sizeof(s_net_stack), 64);
+  while (!s_net_done) {
+    VIDEO_WaitVSync();
+  }
+  ret = s_net_ret;
 
   if (ret < 0) {
     connectivity_ret = ret;
@@ -566,7 +585,13 @@ void run_network_test(void) {
     delay_vsyncs(60);
     net_deinit();
     delay_vsyncs(30);
-    ret = net_init();
+    s_net_done = false;
+    LWP_CreateThread(&s_net_thread, net_init_thread_func, NULL, s_net_stack,
+                     sizeof(s_net_stack), 64);
+    while (!s_net_done) {
+      VIDEO_WaitVSync();
+    }
+    ret = s_net_ret;
     if (ret >= 0) {
       s_wifi_working = true;
       ui_draw_ok("Network connected on retry");

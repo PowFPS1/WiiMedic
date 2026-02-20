@@ -87,17 +87,19 @@ static void test_gc_controllers(void) {
       /* Drift check */
       {
         float stick_dist = sqrtf((float)(stickX * stickX + stickY * stickY));
-        if (stick_dist > 15.0f && btns == 0) {
+        if (stick_dist > 8.0f && btns == 0) {
           snprintf(buf, sizeof(buf),
-                   "Main stick drift detected (distance: %.0f)", stick_dist);
+                   "Main stick drift detected (dist: %.0f from center)",
+                   stick_dist);
           ui_draw_warn(buf);
         }
       }
       {
         float cstick_dist =
             sqrtf((float)(cstickX * cstickX + cstickY * cstickY));
-        if (cstick_dist > 15.0f && btns == 0) {
-          snprintf(buf, sizeof(buf), "C-Stick drift detected (distance: %.0f)",
+        if (cstick_dist > 8.0f && btns == 0) {
+          snprintf(buf, sizeof(buf),
+                   "C-Stick drift detected (dist: %.0f from center)",
                    cstick_dist);
           ui_draw_warn(buf);
         }

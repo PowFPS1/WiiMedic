@@ -4,7 +4,7 @@
 
 # WiiMedic - Wii System Diagnostic & Health Monitor
 
-**Version 1.1.0** | Wii Homebrew Application
+**Version 1.2.0** | Wii Homebrew Application
 
 A comprehensive all-in-one diagnostic tool for the Nintendo Wii. As Wii consoles age (now 20 years old!), hardware issues become increasingly common. WiiMedic gives you a complete picture of your system's health and generates shareable reports for community troubleshooting.
 
@@ -12,71 +12,25 @@ A comprehensive all-in-one diagnostic tool for the Nintendo Wii. As Wii consoles
 
 ## Features
 
-### 1. System Information
-- Console region, firmware version, and video standard
-- Hollywood/Broadway hardware revisions
-- Device ID and Boot2 version (with BootMii compatibility warning)
-- Memory arena status (MEM1/MEM2)
-- Display settings (aspect ratio, progressive scan)
-- **Brick Protection Check** — detects Priiloader, BootMii (boot2), and BootMii (IOS) with overall protection rating
+- **System Information & Health Data**: View firmware info, hardware revisions, BootMii/Priiloader status, and brick protection ratings.
+- **NAND Health Check**: Scans filesystem, space usage, and detects interrupted title installations. 
+- **IOS Installation Scan**: Enumerates all installed IOS versions, detects cIOS and stub IOS configurations.
+- **Storage Speed Test**: Benchmark SD/USB speeds, rating them for optimal homebrew performance.
+- **Controller Diagnostics**: Monitor GameCube & Wii Remote inputs, detects battery levels, stick drift, and IR sensor functionality.
+- **Network Connectivity Test**: Includes a robust WiFi scanner that grabs AP information and WiFi hardware specs (MAC, firmware). Network tests are threaded to prevent hang-ups.
+- **Report Generator**: Dumbs down all diagnostics into a saveable standard text file, ready for easy clipboard sharing.
 
-### 2. NAND Health Check
-- Scans NAND filesystem cluster and inode usage
-- Visual usage bar graphs with color-coded warnings
-- Directory-level scan (/sys, /ticket, /title, /shared1, /tmp, /import)
-- Detects interrupted title installations
-- Calculates a health score out of 100
-- Provides actionable recommendations
 
-### 3. IOS Installation Scan
-- Enumerates ALL installed IOS versions with revision numbers
-- Detects stub IOS (potential problem sources)
-- Identifies cIOS installations (d2x, Waninkoko, etc.)
-- Detects BootMii IOS
-- Descriptions for important IOS slots
-- Warns if no cIOS is found for USB loader compatibility
-
-### 4. Storage Speed Test
-- Benchmarks SD card read/write speeds (1MB test, 3 iterations)
-- Benchmarks USB drive read/write speeds
-- Reports speed ratings (Excellent/Acceptable/Slow)
-- Counts homebrew apps in /apps directory
-- Tips for optimal storage configuration
-
-### 5. Controller Diagnostics
-- Tests all 4 GameCube controller ports
-- Tests all 4 Wii Remote channels
-- Real-time button, stick, and trigger readings
-- Detects analog stick drift with threshold warnings
-- Identifies Wii Remote extensions (Nunchuk, Classic Controller, etc.)
-- Battery level monitoring for Wii Remotes
-- IR sensor functionality check
-
-### 6. Network Connectivity Test
-- WiFi module initialization test
-- IP address configuration display
-- DHCP validation
-- TCP connectivity tests to known servers
-- Internet connectivity rating (Full/Partial/None)
-- **WiFi Card Info** — MAC address, firmware version, country code, supported channels
-- **WiFi AP Scanner** — Scans for nearby access points showing SSID, signal strength, channel, and security type
-- Tips for Wiimmfi and WiiLink connectivity
-
-### 7. Full Report Generator
-- Runs all diagnostics and saves to `sd:/WiiMedic_Report.txt`
-- Shareable plain text format
-- Perfect for pasting into forum posts or Reddit when asking for help
 
 ---
 
-## Changes since v1.0.0
-- WiFi Card Info: displays MAC address, firmware, country code, and enabled channels (requires libogc 3.0.0+)
-- WiFi AP Scanner: scans nearby access points with SSID, signal strength, channel, and security info
-- Scrollable diagnostic screens (UP/DOWN line-by-line, LEFT/RIGHT page)
-- Fixed Wii Remote detection in Controller Diagnostics and Report
-- Report detects existing reports: replace, keep both, or cancel
-- Report saves to USB if no SD card available
-- All module output routed through scroll buffer
+## Changes since v1.1.0
+- **Priiloader Version Detection**: Advanced scanner to detect the exact version of Priiloader installed on the NAND.
+- **Threaded Network Initialization**: Network tests are now threaded, drastically improving responsiveness and preventing the app from hanging.
+- **Refined Battery Display**: Accurately displays 0-4 battery bars to perfectly match the Wii Menu indicators, hiding unnecessary technical hex values.
+- **Improved Controller Diagnostics**: Better stick drift detection and threshold warnings.
+- **Safer Report Generation**: Hardened report generation system that prevents truncation issues when handling missing network hardware info.
+- **Enhanced WiFi Hardware Validation**: Added specific detection to differentiate between WiFi module operational status versus missing/invalid hardware info.
 
 ---
 
@@ -110,37 +64,26 @@ A comprehensive all-in-one diagnostic tool for the Nintendo Wii. As Wii consoles
 
 ### Prerequisites
 - [devkitPro](https://devkitpro.org/) with devkitPPC
-- libogc 3.0.0+ (included with devkitPro; required for WiFi scanning features)
-- libfat (included with devkitPro)
+- libogc 3.0.0+ and libfat
 
 ### Build Steps
 ```bash
-# Install devkitPro (if not already installed)
-# Follow instructions at https://devkitpro.org/wiki/Getting_Started
-
-# Set environment variable
+# Set environment variable if needed
 export DEVKITPPC=/opt/devkitpro/devkitPPC
 
-# Clone and build
-cd WiiMedic
-make
-
-# Output: boot.dol (copy to SD:/apps/WiiMedic/)
-```
-
-### Build on Windows
-```powershell
-# After installing devkitPro via installer
-# Open MSys2 terminal from devkitPro
-cd WiiMedic
+# Build the DOL file
 make
 ```
 
-### Clean Build
+### Create release zip (for GitHub Releases)
+After building, create a zip with `boot.dol`, `meta.xml`, and `icon.png` (same layout users extract to SD/USB):
+
 ```bash
-make clean
-make
+make dist
+# Creates: WiiMedic_v1.1.0.zip (contains WiiMedic/boot.dol, meta.xml, icon.png)
 ```
+
+Upload `WiiMedic_v1.1.0.zip` to a GitHub Release so users can download and copy the `WiiMedic` folder to `SD:/apps/` or `USB:/apps/`.
 
 ---
 
@@ -163,34 +106,30 @@ After generating a report, the file is saved as `WiiMedic_Report.txt` in the roo
 
 1. Remove SD card from Wii and insert into PC
 2. Open `WiiMedic_Report.txt`
-3. Copy and paste the contents into a forum post, Reddit thread, or Discord message, etc.
+3. Copy and paste the contents into a forum post, Reddit thread, or Discord message
 4. The report contains NO personal information beyond your Wii's Device ID
 
 ---
 
 ## Technical Details
 
+- **Toolchain:** devkitPPC (GCC for PowerPC)
 - **Libraries:** libogc, libfat, wiiuse, bte
-- **Output:** DOL executable
+- **Target:** Nintendo Wii (Homebrew Channel)
 - **Compatibility:** All Wii models (RVL-001, RVL-101), Wii U vWii
 
 ---
 
-## Why WiiMedic?
-
-As of 2026, the Nintendo Wii is 20 years old. The homebrew community is thriving, but aging hardware brings challenges:
-
-- **NAND degradation** - Bad blocks develop over time
-- **Stick drift** - Analog sticks wear out on controllers
-- **WiFi issues** - Wireless modules can degrade
-- **Storage problems** - SD cards and USB drives fail silently
-- **Softmod confusion** - Users can't easily verify their setup is correct
-
-People frequently post on r/WiiHacks and GBAtemp asking "is my Wii broken?" or "why isn't this working?" WiiMedic gives them (and you) a quick, comprehensive answer.
-
----
-
 ## Changelog
+
+### v1.2.0
+- **Priiloader Detection System**: Detects installed Priiloader and extracts the exact version string from the NAND binary (e.g., "v0.10").
+- **Threaded Network Init**: Network initialization is now placed on a separate thread, providing a much smoother UI experience during tests.
+- **Accurate Battery Bars**: Completely revamped battery reporting to show precisely 0-4 bars corresponding to the real Wii Menu, stripping out irrelevant raw voltage data.
+- **Safer Report Generation**: Fixed bugs that caused reports to be truncated if specific WiFi hardware data was invalid. Added `memcpy`-based header patching.
+- **Improved Drift Detection**: Refined logic for detecting controller stick drift across GameCube controllers and Wii extensions.
+- **WiFi Validation Flag**: Implemented a `s_wdinfo_valid` flag to gracefully handle scenarios where the driver works but hardware info is corrupt.
+- **Simplified UI Presence Checks**: Priiloader presence checks simplified for standard diagnostics.
 
 ### v1.1.0
 - **Brick Protection Check**: Detects Priiloader, BootMii (boot2), and BootMii (IOS) with a protection rating
@@ -216,4 +155,3 @@ People frequently post on r/WiiHacks and GBAtemp asking "is my Wii broken?" or "
 - Inspired by the Wii homebrew community's need for better diagnostic tools
 
 - Thanks to the r/WiiHacks and GBAtemp communities
-

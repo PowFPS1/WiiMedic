@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "system_info.h"
 #include "ui_common.h"
@@ -106,6 +107,62 @@ static bool detect_priiloader(void) {
   return detected;
 }
 
+/*
+ * Scans the active System Menu binary (Priiloader) for its version string.
+ * Special thanks and credit to Abdelali221 for creating the version shower!
+ */
+static void get_priiloader_version(char *out_version, int max_len) {
+  strncpy(out_version, "Unknown", max_len);
+
+  u32 content_id = get_SM_boot_content_id();
+  if (content_id == 0)
+    return;
+
+  s32 isfs_res = ISFS_Initialize();
+  bool we_initialized_isfs = (isfs_res >= 0);
+
+  char path[ISFS_MAXPATH];
+  snprintf(path, sizeof(path), "/title/00000001/00000002/content/%08x.app",
+           (unsigned int)content_id);
+  s32 fd = ISFS_Open(path, ISFS_OPEN_READ);
+  if (fd >= 0) {
+    u32 buf_size = 4096;
+    u8 *buf = memalign(32, buf_size);
+    if (buf) {
+      s32 read_bytes;
+      bool found = false;
+      while (!found && (read_bytes = ISFS_Read(fd, buf, buf_size)) > 0) {
+        /* Scan for "0.10.x" or "v0.x" strings representing priiloader versions
+         */
+        for (int i = 0; i < read_bytes - 12; i++) {
+          if ((buf[i] == '0' && buf[i + 1] == '.' && buf[i + 2] == '1' &&
+               buf[i + 3] == '0' && buf[i + 4] == '.') ||
+              (buf[i] == 'v' && buf[i + 1] == '0' && buf[i + 2] == '.')) {
+            strncpy(out_version, (char *)&buf[i], max_len - 1);
+            out_version[max_len - 1] = '\0';
+            for (int j = 0; j < strlen(out_version); j++) {
+              if (out_version[j] < 0x20 || out_version[j] > 0x7E) {
+                out_version[j] = '\0';
+                break;
+              }
+            }
+            if (strlen(out_version) > 3) {
+              found = true;
+              break;
+            }
+          }
+        }
+      }
+      free(buf);
+    }
+    ISFS_Close(fd);
+  }
+
+  if (we_initialized_isfs) {
+    ISFS_Deinitialize();
+  }
+}
+
 static bool detect_bootmii_ios(void) {
   u32 tmd_size = 0;
   u64 tid_254 = 0x00000001000000FEULL; /* IOS254 */
@@ -149,6 +206,7 @@ static int get_boot1_bootmii_compatible(void) {
     /* FIX: Add timeout to prevent infinite hang */
     u32 timeout = 10000;
     while ((hw[HW_OTPCMD_OFF / 4] & OTP_RD_BIT) && timeout > 0) {
+      usleep(100);
       timeout--;
     }
     if (timeout == 0)
@@ -318,6 +376,9 @@ void run_system_info(void) {
 
     if (has_priiloader) {
       ui_draw_kv_color("Priiloader", UI_BGREEN, "Installed");
+      char p_ver[32];
+      get_priiloader_version(p_ver, sizeof(p_ver));
+      ui_printf("   " UI_BCYAN "(i) " UI_WHITE " %s\n" UI_RESET, p_ver);
       protection_count++;
     } else {
       ui_draw_kv_color("Priiloader", UI_BRED, "Not found");
@@ -389,7 +450,16 @@ void get_system_info_report(char *buf, int bufsize) {
     /* Logic correction: boot1 compatible means boot2 install is possible */
     bool has_bootmii_boot2 = (boot1_ok == 1);
 
-    const char *prii_status = has_priiloader ? "Installed" : "Not found";
+    char p_ver[32] = "";
+    if (has_priiloader) {
+      get_priiloader_version(p_ver, sizeof(p_ver));
+    }
+    char prii_str[64];
+    if (has_priiloader) {
+      snprintf(prii_str, sizeof(prii_str), "Installed (%s)", p_ver);
+    } else {
+      strcpy(prii_str, "Not found");
+    }
 
     const char *boot2_str;
     if (hollywood_ver >= 0x21)
@@ -432,7 +502,7 @@ void get_system_info_report(char *buf, int bufsize) {
              get_region_string(), get_video_mode_string(),
              get_language_string(), get_aspect_string(),
              get_progressive_string(), hollywood_ver, device_id, boot2_version,
-             ios_ver, ios_rev, mem1_size / 1024, mem2_size / 1024, prii_status,
+             ios_ver, ios_rev, mem1_size / 1024, mem2_size / 1024, prii_str,
              boot2_str, has_bootmii_ios ? "Installed" : "Not found", rating);
   }
 }

@@ -1,6 +1,6 @@
 #---------------------------------------------------------------------------------
 # WiiMedic - Wii System Diagnostic & Health Monitor
-# Makefile for devkitPPC / libogc
+# Makefile for devkitPPC / libogc (Flattened for Windows Robustness)
 #---------------------------------------------------------------------------------
 
 ifeq ($(strip $(DEVKITPPC)),)
@@ -22,11 +22,23 @@ DATA		:=	data
 INCLUDES	:=	source
 
 #---------------------------------------------------------------------------------
+# build a list of include paths
+#---------------------------------------------------------------------------------
+INCLUDE	:=	$(foreach dir,$(INCLUDES),-I$(dir)) \
+			-I$(BUILD) \
+			-I"C:/devkitPro/libogc/include"
+
+#---------------------------------------------------------------------------------
+# build a list of library paths
+#---------------------------------------------------------------------------------
+LIBPATHS :=	-L"C:/devkitPro/libogc/lib/wii"
+
+#---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
-CFLAGS		=	-g -O2 -Wall $(MACHDEP) $(INCLUDE)
-CXXFLAGS	=	$(CFLAGS)
-LDFLAGS		=	-g $(MACHDEP) -Wl,-Map,$(notdir $@).map
+CFLAGS		:=	-g -O2 -Wall $(MACHDEP) $(INCLUDE)
+CXXFLAGS	:=	$(CFLAGS)
+LDFLAGS		:=	-g $(MACHDEP) -Wl,-Map,$(TARGET).map
 
 #---------------------------------------------------------------------------------
 # any extra libraries we wish to link with the project
@@ -34,114 +46,71 @@ LDFLAGS		=	-g $(MACHDEP) -Wl,-Map,$(notdir $@).map
 LIBS	:=	-lwiiuse -lbte -lfat -logc -lm
 
 #---------------------------------------------------------------------------------
-# list of directories containing libraries, this must be the top level containing
-# include and lib
-#---------------------------------------------------------------------------------
-LIBDIRS	:= $(PORTLIBS)
-
-#---------------------------------------------------------------------------------
-# no real need to edit anything past this point unless you need to add additional
-# temporary utility rules
-#---------------------------------------------------------------------------------
-ifneq ($(BUILD),$(notdir $(CURDIR)))
-#---------------------------------------------------------------------------------
-
-export OUTPUT	:=	$(CURDIR)/$(TARGET)
-
-export VPATH	:=	$(foreach dir,$(SOURCES),$(CURDIR)/$(dir)) \
-					$(foreach dir,$(DATA),$(CURDIR)/$(dir))
-
-export DEPSDIR	:=	$(CURDIR)/$(BUILD)
-
-#---------------------------------------------------------------------------------
 # automatically build a list of object files for our project
 #---------------------------------------------------------------------------------
-CFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
-CPPFILES	:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp)))
-sFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))
-SFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.S)))
-BINFILES	:=	$(foreach dir,$(DATA),$(notdir $(wildcard $(dir)/*.*)))
+CFILES		:=	$(wildcard $(SOURCES)/*.c)
+CPPFILES	:=	$(wildcard $(SOURCES)/*.cpp)
+sFILES		:=	$(wildcard $(SOURCES)/*.s)
+SFILES		:=	$(wildcard $(SOURCES)/*.S)
 
-# LD not exported here; sub-make uses $(CC) for linking (see .elf rule in else branch)
+OFILES		:=	$(CFILES:$(SOURCES)/%.c=$(BUILD)/%.o) \
+				$(CPPFILES:$(SOURCES)/%.cpp=$(BUILD)/%.o) \
+				$(sFILES:$(SOURCES)/%.s=$(BUILD)/%.o) \
+				$(SFILES:$(SOURCES)/%.S=$(BUILD)/%.o)
 
-export OFILES_BIN	:=	$(addsuffix .o,$(BINFILES))
-export OFILES_SOURCES := $(CPPFILES:.cpp=.o) $(CFILES:.c=.o) $(sFILES:.s=.o) $(SFILES:.S=.o)
-export OFILES := $(OFILES_BIN) $(OFILES_SOURCES)
+VERSION		:=	1.2.0
+DIST_DIR	:=	$(CURDIR)/dist
 
-export HFILES := $(addsuffix .h,$(subst .,_,$(BINFILES)))
+.PHONY: all clean dist install
 
-#---------------------------------------------------------------------------------
-# build a list of include paths
-#---------------------------------------------------------------------------------
-export INCLUDE	:=	$(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
-					$(foreach dir,$(LIBDIRS),-I$(dir)/include) \
-					-I$(CURDIR)/$(BUILD) \
-					-I$(LIBOGC_INC)
+all: $(BUILD) $(TARGET).dol
 
-#---------------------------------------------------------------------------------
-# build a list of library paths
-#---------------------------------------------------------------------------------
-export LIBPATHS	:=	$(foreach dir,$(LIBDIRS),-L$(dir)/lib) \
-					-L$(LIBOGC_LIB)
-
-export OUTPUT	:=	$(CURDIR)/$(TARGET)
-.PHONY: all $(BUILD) clean install
-
-all: $(BUILD)
-
-#---------------------------------------------------------------------------------
-# Install to E:\apps\WiiMedic (override: make install INSTALL_DIR=/f/apps/WiiMedic)
-#---------------------------------------------------------------------------------
-INSTALL_DIR	?=	/e/apps/WiiMedic
-
-install: $(BUILD)
-	@echo Installing to $(INSTALL_DIR) ...
-	@mkdir -p "$(INSTALL_DIR)"
-	@cp -v "$(OUTPUT).dol" "$(INSTALL_DIR)/boot.dol"
-	@cp -v "$(CURDIR)/meta.xml" "$(INSTALL_DIR)/"
-	@cp -v "$(CURDIR)/icon.png" "$(INSTALL_DIR)/"
-	@echo Done. WiiMedic is in $(INSTALL_DIR)
-
-#---------------------------------------------------------------------------------
 $(BUILD):
-	@[ -d $(BUILD) ] || mkdir -p $(BUILD)
-	@$(MAKE) --no-print-directory -C $(BUILD) -f "$(CURDIR)/Makefile"
+	@if [ ! -d "$(BUILD)" ]; then mkdir -p "$(BUILD)"; fi
 
-#---------------------------------------------------------------------------------
+$(TARGET).dol: $(TARGET).elf
+	@echo creating $(notdir $@)
+	@elf2dol "$<" "$@"
+
+$(TARGET).elf: $(OFILES)
+	@echo linking $(notdir $@)
+	@$(CC) $(LDFLAGS) $(OFILES) $(LIBPATHS) $(LIBS) -o "$@"
+
+$(BUILD)/%.o: $(SOURCES)/%.c
+	@echo $(notdir $<)
+	@$(CC) $(CFLAGS) -c "$<" -o "$@"
+
+$(BUILD)/%.o: $(SOURCES)/%.cpp
+	@echo $(notdir $<)
+	@$(CXX) $(CXXFLAGS) -c "$<" -o "$@"
+
+$(BUILD)/%.o: $(SOURCES)/%.s
+	@echo $(notdir $<)
+	@$(CC) -x assembler-with-cpp $(CFLAGS) -c "$<" -o "$@"
+
+$(BUILD)/%.o: $(SOURCES)/%.S
+	@echo $(notdir $<)
+	@$(CC) -x assembler-with-cpp $(CFLAGS) -c "$<" -o "$@"
+
 clean:
 	@echo clean ...
-	@rm -rf $(BUILD) $(OUTPUT).elf $(OUTPUT).dol
+	@rm -rf "$(BUILD)" "$(TARGET).elf" "$(TARGET).dol" "$(TARGET).map"
 
-#---------------------------------------------------------------------------------
-run:
-	wiiload $(OUTPUT).dol
+install: all
+	@echo Installing to $(INSTALL_DIR) ...
+	@mkdir -p "$(INSTALL_DIR)"
+	@cp -v "$(TARGET).dol" "$(INSTALL_DIR)/boot.dol"
+	@cp -v "$(CURDIR)/meta.xml" "$(INSTALL_DIR)/"
+	@cp -v "$(CURDIR)/icon.png" "$(INSTALL_DIR)/"
+	@echo Done.
 
-#---------------------------------------------------------------------------------
-else
-
-# Sub-make (in build/): use CC as linker (devkitPro uses gcc for linking)
-LD := $(CC)
-
-DEPENDS	:=	$(OFILES:.o=.d)
-
-#---------------------------------------------------------------------------------
-# main targets
-#---------------------------------------------------------------------------------
-$(OUTPUT).dol: $(OUTPUT).elf
-$(OUTPUT).elf: $(OFILES)
-	$(CC) -o $@ $(OFILES) $(LDFLAGS) $(LIBPATHS) $(LIBS)
-
-$(OFILES_SOURCES) : $(HFILES)
-
-#---------------------------------------------------------------------------------
-# This rule links in binary data with the .bin extension
-#---------------------------------------------------------------------------------
-%.bin.o	%_bin.h :	%.bin
-	@echo $(notdir $<)
-	@$(bin2o)
-
--include $(DEPENDS)
-
-#---------------------------------------------------------------------------------
-endif
-#---------------------------------------------------------------------------------
+dist: all
+	@echo Creating release zip...
+	@rm -rf "$(DIST_DIR)"
+	@mkdir -p "$(DIST_DIR)/WiiMedic"
+	@cp -v "$(TARGET).dol" "$(DIST_DIR)/WiiMedic/boot.dol"
+	@cp -v "$(CURDIR)/meta.xml" "$(DIST_DIR)/WiiMedic/"
+	@if [ -f "$(CURDIR)/icon.png" ]; then cp -v "$(CURDIR)/icon.png" "$(DIST_DIR)/WiiMedic/"; fi
+	@cd "$(DIST_DIR)" && zip -r "$(CURDIR)/WiiMedic_v$(VERSION).zip" WiiMedic
+	@rm -rf "$(DIST_DIR)"
+	@echo Done. Release: WiiMedic_v$(VERSION).zip

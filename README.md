@@ -123,7 +123,7 @@ After generating a report, the file is saved as `WiiMedic_Report.txt` in the roo
 ## Changelog
 
 ### v1.2.0
-- **Priiloader Detection System**: Detects installed Priiloader and extracts the exact version string from the NAND binary (e.g., "v0.10").
+- **Priiloader Detection System**: Detects installed Priiloader and extracts the exact version string from the NAND binary.
 - **Threaded Network Init**: Network initialization is now placed on a separate thread, providing a much smoother UI experience during tests.
 - **Accurate Battery Bars**: Completely revamped battery reporting to show precisely 0-4 bars corresponding to the real Wii Menu, stripping out irrelevant raw voltage data.
 - **Safer Report Generation**: Fixed bugs that caused reports to be truncated if specific WiFi hardware data was invalid. Added `memcpy`-based header patching.
@@ -155,3 +155,4 @@ After generating a report, the file is saved as `WiiMedic_Report.txt` in the roo
 - Inspired by the Wii homebrew community's need for better diagnostic tools
 
 - Thanks to the r/WiiHacks and GBAtemp communities
+

@@ -36,7 +36,7 @@ I built this because I kept seeing people post vague "my Wii is broken" threads 
 Just drop it in your `apps` folder like any other homebrew.
 
 **SD card:** Copy the `WiiMedic` folder to `SD:/apps/`  
-**USB drive:** Copy it to `USB:/apps/` — use the bottom port on the back of the Wii
+**USB drive:** Copy it to `USB:/apps/`
 
 The folder should look like this:
 ```

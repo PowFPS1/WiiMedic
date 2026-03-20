@@ -7,7 +7,7 @@
 
 ---
 
-Wii consoles are 20 years old now. Sometimes it's obvious (won't boot, bad disc read), but a lot of the time you just get weird behavior and dont know where to start. That's what WiiMedic is for. it gives you a full picture of what's going on inside your system, so you can diagnose it yourself or share a report with someone who can help.
+Wii consoles are nearly 20 years old now. Things can go wrong, however sometimes it's obvious (won't boot, bad disc read), but a lot of the time you just get weird behavior and dont know where to start. That's what WiiMedic is for. it gives you a full picture of what's going on inside your system, so you can diagnose it yourself or share a report with someone who can help.
 
 I built this because I kept seeing people post vague "my Wii is broken" threads with zero useful info. Now you can just run WiiMedic, generate a report, and paste it. Done.
 
@@ -117,7 +117,7 @@ Works on all Wii models (RVL-001 and RVL-101) and Wii U vWii.
 
 Developed by **PowFPS1**
 
-**Abdelali221** helped a ton with the WiFi card info and AP scanning — the network module wouldn't be what it is without them.
+**Abdelali221** helped a lot with the WiFi card info and AP scanning.
 
 Built with [devkitPro](https://devkitpro.org/) and [libogc](https://github.com/devkitPro/libogc). Thanks to r/WiiHacks and GBAtemp for feedback and testing.
 
@@ -128,9 +128,9 @@ Built with [devkitPro](https://devkitpro.org/) and [libogc](https://github.com/d
 ### v1.2.0
 - Priiloader version detection (reads version string from NAND binary directly)
 - Threaded network initialization — UI stays smooth during tests
-- Battery display revamped to show 0–4 bars matching the Wii Menu exactly
+- Battery display chnaged to show 0–4 bars matching the Wii Menu (still not perfect)
 - Fixed report truncation bug when WiFi hardware data is missing/corrupt
-- Added `s_wdinfo_valid` flag for graceful handling of corrupt WiFi hardware info
+- Added `s_wdinfo_valid` flag for better handling of corrupt WiFi hardware info
 - Improved stick drift detection across GameCube and Wii extension controllers
 - `memcpy`-based header patching in report generation
 

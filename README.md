@@ -69,7 +69,7 @@ Run the diagnostics, go to Report Generator, save. Then:
 
 1. Pull the SD card out, stick it in your PC
 2. Open `WiiMedic_Report.txt`
-3. Paste it wherever — Reddit, GBAtemp, Discord, wherever you're getting help
+3. Paste it wherever you're getting help
 
 The report is designed to be readable by people who aren't experts, but detailed enough that people who are can use it.
 

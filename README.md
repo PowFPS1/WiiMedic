@@ -25,7 +25,7 @@ I built this because I kept seeing people post vague "my Wii is broken" threads 
 
 **Controller Diagnostics** — Live input monitor for GameCube controllers and Wii Remotes. Checks battery level, stick drift, and IR sensor function. Good for figuring out if a controller is broken or miscalibrated.
 
-**Network Test** — Scans for nearby access points and pulls your WiFi module info (MAC address, firmware version, channel info). The network stuff is threaded now, so it won't just hang and make you think the app crashed.
+**Network Test** — Scans for nearby access points and pulls your WiFi module info (MAC address, firmware version, channel info). The network stuff is threaded now, so it won't hang and make you think the app crashed.
 
 **Report Generator** — Saves everything to `WiiMedic_Report.txt` on your SD card.
 

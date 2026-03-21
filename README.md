@@ -9,7 +9,7 @@
 
 Wii consoles are nearly 20 years old now. Things can go wrong, however sometimes it's obvious (won't boot, bad disc read), but a lot of the time you just get weird behavior and dont know where to start. That's what WiiMedic is for. it gives you a full picture of what's going on inside your system, so you can diagnose it yourself or share a report with someone who can help.
 
-I built this because I kept seeing people post vague "my Wii is broken" threads with zero useful info. Now you can just run WiiMedic, generate a report, and paste it. Done.
+I built this because I kept seeing people post vague "my Wii is broken"  on forums with no useful info. Now you can just run WiiMedic, generate a report, and paste it.
 
 ---
 

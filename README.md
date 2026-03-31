@@ -119,6 +119,8 @@ Developed by **PowFPS1**
 
 **Abdelali221** helped a lot with the WiFi card info and AP scanning.
 
+Thanks to Claude for coding help.
+
 Built with [devkitPro](https://devkitpro.org/) and [libogc](https://github.com/devkitPro/libogc). Thanks to r/WiiHacks and GBAtemp for feedback and testing.
 
 ---

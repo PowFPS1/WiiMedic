@@ -69,7 +69,7 @@ run the diagnostics, go to Report Generator, save. then:
 2. open `WiiMedic_Report.txt`
 3. paste it wherever you're getting help
 
-I tried to make the report readable for people who aren't super into Wii stuff, but detailed enough that people who are are able to use it to help you. I think it hits fairly well balanced but I'm not sure, it's better than nothing or just saying "my Wii is broken" with no other context.
+I tried to make the report readable for people who aren't super into Wii stuff, but detailed enough that people who are are able to use it to help you. I think its fairly well balanced but I'm not sure, it's better than nothing or just saying "my Wii is broken" with no other context.
 
 ---
 

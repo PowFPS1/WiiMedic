@@ -1,14 +1,13 @@
-/*
- * WiiMedic - report.c
- * Generates a comprehensive diagnostic report and saves to SD card
- */
+// report.c - generates and saves the full diagnostic report
 
 #include <fat.h>
 #include <gccore.h>
 #include <malloc.h>
 #include <network.h>
+#include <ogc/lwp.h>
 #include <ogc/lwp_watchdog.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,13 +23,41 @@
 #include "system_info.h"
 #include "ui_common.h"
 
-/* Increased to 64KB to handle detailed IOS/NAND lists without truncation */
 #define REPORT_MAX_SIZE 65536
-#define REPORT_PATH_SD "sd:/WiiMedic_Report.txt"
+#define REPORT_PATH_SD  "sd:/WiiMedic_Report.txt"
 #define REPORT_PATH_USB "usb:/WiiMedic_Report.txt"
 
-/*---------------------------------------------------------------------------*/
-/* Helper to append text to the report safely. */
+// spinner shown during slow silent steps so it doesn't look frozen
+static volatile bool s_spin = false;
+static lwp_t s_spin_thd;
+static u8 s_spin_stk[4096] __attribute__((aligned(32)));
+
+static void *spinner_thread(void *arg) {
+  const char *frames = "|/-\\";
+  int f = 0;
+  (void)arg;
+  while (s_spin) {
+    printf("\r   " UI_BYELLOW "[%c]" UI_RESET " working on it...", frames[f & 3]);
+    f++;
+    int i;
+    for (i = 0; i < 6 && s_spin; i++)
+      VIDEO_WaitVSync();
+  }
+  printf("\r                              \r");
+  return NULL;
+}
+
+static void spin_start(void) {
+  s_spin = true;
+  LWP_CreateThread(&s_spin_thd, spinner_thread, NULL, s_spin_stk,
+                   sizeof(s_spin_stk), 80);
+}
+
+static void spin_stop(void) {
+  s_spin = false;
+  LWP_JoinThread(s_spin_thd, NULL);
+}
+
 static void report_append(FILE *fp, const char *fmt, ...) {
   if (!fp)
     return;
@@ -152,7 +179,7 @@ static int ask_existing_report_action(const char *path, long size) {
 
 /*---------------------------------------------------------------------------*/
 void run_report_generator(void) {
-  char section[8192];
+  static char section[8192]; /* static: avoids large stack frame */
   char buf[128];
   FILE *fp = NULL;
 
@@ -228,17 +255,22 @@ void run_report_generator(void) {
           "Share this report when asking for help on forums or Reddit.\n"
           "----------------------------------------------------------\n\n");
 
-  /* 1: System Info */
-  ui_printf(UI_BCYAN "   [1/6]" UI_WHITE
-                     " Collecting system information...\n" UI_RESET);
+  // step 1 - system info does ISFS reads which can hang for a couple seconds
+  ui_printf(UI_BCYAN "   [1/6]" UI_WHITE " Collecting system information...\n" UI_RESET);
+  spin_start();
   memset(section, 0, sizeof(section));
   get_system_info_report(section, sizeof(section));
+  spin_stop();
   report_append(fp, "%s", section);
   ui_draw_ok("Done.");
 
   /* 2: NAND Health */
   ui_printf(UI_BCYAN "   [2/6]" UI_WHITE " Scanning NAND health...\n" UI_RESET);
-  run_nand_health();
+  if (!has_nand_health_run()) {
+    run_nand_health();
+  } else {
+    ui_printf("   " UI_WHITE "Using cached NAND results\n" UI_RESET);
+  }
   memset(section, 0, sizeof(section));
   get_nand_health_report(section, sizeof(section));
   report_append(fp, "%s", section);
@@ -274,9 +306,11 @@ void run_report_generator(void) {
   }
   ui_draw_ok("Done.");
 
-  /* 5: Controllers */
+  // step 5 - controller scan has a 30-frame BT warmup that looks frozen without a spinner
   ui_printf(UI_BCYAN "   [5/6]" UI_WHITE " Checking controllers...\n" UI_RESET);
+  spin_start();
   scan_controllers_quick();
+  spin_stop();
   memset(section, 0, sizeof(section));
   get_controller_test_report(section, sizeof(section));
   report_append(fp, "%s", section);

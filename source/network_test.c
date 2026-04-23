@@ -1,15 +1,7 @@
-/*
- * WiiMedic - network_test.c
- * Tests WiFi module, connection status, IP configuration,
- * WiFi card info, and nearby AP scanning (libogc 3.0.0+)
- *
- * Order: connectivity first (net_init -> IP -> connection tests -> net_deinit),
- * then WiFi card info + AP scan (WD_Init in scan mode after network released).
- * This lets the driver be free for WD so AP scan can work without NCD lock.
- *
- * WiFi card info and AP scan implementation: thanks to Abdelali221 for help
- * with the network code.
- */
+// network_test.c - WiFi module info, connectivity test, and AP scanner
+//
+// order matters: net_init first to get IP, then release so WD can do the AP scan
+// thanks to Abdelali221 for help with the WiFi card info and AP scanning
 
 #include <errno.h>
 #include <gccore.h>
@@ -66,22 +58,23 @@ static void *net_init_thread_func(void *arg) {
   return NULL;
 }
 
-/*---------------------------------------------------------------------------*/
+
 bool has_network_test_run(void) { return s_test_done; }
 
-/*---------------------------------------------------------------------------*/
-static void ip_to_str(u32 ip, char *buf) {
-  sprintf(buf, "%d.%d.%d.%d", (ip >> 24) & 0xFF, (ip >> 16) & 0xFF,
-          (ip >> 8) & 0xFF, ip & 0xFF);
+
+// unpack a u32 IP into dotted notation
+static void ip_to_str(u32 ip, char *buf, size_t bufsize) {
+  snprintf(buf, bufsize, "%d.%d.%d.%d", (ip >> 24) & 0xFF, (ip >> 16) & 0xFF,
+           (ip >> 8) & 0xFF, ip & 0xFF);
 }
 
-/*---------------------------------------------------------------------------*/
-static void mac_to_str(const u8 *mac, char *buf) {
-  sprintf(buf, "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3],
-          mac[4], mac[5]);
+
+static void mac_to_str(const u8 *mac, char *buf, size_t bufsize) {
+  snprintf(buf, bufsize, "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1],
+           mac[2], mac[3], mac[4], mac[5]);
 }
 
-/*---------------------------------------------------------------------------*/
+
 static const char *get_security_str(BSSDescriptor *bss) {
   if (!(bss->Capabilities & CAPAB_SECURED_FLAG))
     return "Open";
@@ -90,7 +83,7 @@ static const char *get_security_str(BSSDescriptor *bss) {
   return "WEP/WPA";
 }
 
-/*---------------------------------------------------------------------------*/
+
 static const char *get_signal_str(u8 level) {
   if (level == 0)
     return "Weak  ";
@@ -101,7 +94,7 @@ static const char *get_signal_str(u8 level) {
   return "Strong";
 }
 
-/*---------------------------------------------------------------------------*/
+
 static bool test_tcp_connection(const char *host_desc, u32 host_ip, u16 port) {
   s32 sock = net_socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
   struct sockaddr_in addr;
@@ -140,14 +133,14 @@ static bool test_tcp_connection(const char *host_desc, u32 host_ip, u16 port) {
   }
 }
 
-/*---------------------------------------------------------------------------*/
+
 static void delay_vsyncs(int count) {
   int i;
   for (i = 0; i < count; i++)
     VIDEO_WaitVSync();
 }
 
-/*---------------------------------------------------------------------------*/
+
 /* Compute BSS entry length. Some buffers use descriptor length + IEs. */
 static u16 bss_entry_len(BSSDescriptor *bss) {
   if (bss->length != 0)
@@ -159,7 +152,7 @@ static u16 bss_entry_len(BSSDescriptor *bss) {
   }
 }
 
-/*---------------------------------------------------------------------------*/
+
 /*
  * Parse scan buffer and report APs. Tries format: 2-byte big-endian count
  * then BSSDescriptor list (entry stride from bss_entry_len). Falls back to
@@ -220,7 +213,7 @@ static int do_ap_scan(int *rpos_ptr, u8 *scan_buf, s32 scan_ret) {
         else
           strcpy(ssid, "(Hidden)");
 
-        mac_to_str(bss->BSSID, bssid_str);
+        mac_to_str(bss->BSSID, bssid_str, sizeof(bssid_str));
         signal = WD_GetRadioLevel(bss);
 
         snprintf(line, sizeof(line), "%-24s Ch:%-2d  Sig:%s  %s", ssid,
@@ -277,7 +270,7 @@ static int do_ap_scan(int *rpos_ptr, u8 *scan_buf, s32 scan_ret) {
         else
           strcpy(ssid, "(Hidden)");
 
-        mac_to_str(bss->BSSID, bssid_str);
+        mac_to_str(bss->BSSID, bssid_str, sizeof(bssid_str));
         signal = WD_GetRadioLevel(bss);
 
         snprintf(line, sizeof(line), "%-24s Ch:%-2d  Sig:%s  %s", ssid,
@@ -315,7 +308,7 @@ static int do_ap_scan(int *rpos_ptr, u8 *scan_buf, s32 scan_ret) {
   return scan_count;
 }
 
-/*---------------------------------------------------------------------------*/
+
 void run_network_test(void) {
   int rpos = 0;
   s32 ret;
@@ -388,7 +381,7 @@ void run_network_test(void) {
       if (ip != 0) {
         u8 first_octet, second_octet;
         s_ip_obtained = true;
-        ip_to_str(ip, s_ip_str);
+        ip_to_str(ip, s_ip_str, sizeof(s_ip_str));
         ui_draw_kv("IP Address", s_ip_str);
         ui_draw_kv("Config Method", "Obtained via DHCP");
         first_octet = (ip >> 24) & 0xFF;
@@ -479,7 +472,7 @@ void run_network_test(void) {
 
         if (mac_ok && s_wdinfo.channel >= 1 && s_wdinfo.channel <= 14) {
           s_wdinfo_valid = true;
-          mac_to_str(s_wdinfo.MAC, mac_str);
+          mac_to_str(s_wdinfo.MAC, mac_str, sizeof(mac_str));
           ui_draw_kv("MAC Address", mac_str);
 
           /* Safety: ensure version is a clean string */
@@ -602,7 +595,7 @@ void run_network_test(void) {
         if (ip != 0) {
           u8 first_octet, second_octet;
           s_ip_obtained = true;
-          ip_to_str(ip, s_ip_str);
+          ip_to_str(ip, s_ip_str, sizeof(s_ip_str));
           ui_draw_kv("IP Address", s_ip_str);
           ui_draw_kv("Config Method", "Obtained via DHCP");
           first_octet = (ip >> 24) & 0xFF;
@@ -716,7 +709,7 @@ void run_network_test(void) {
   s_test_done = true;
 }
 
-/*---------------------------------------------------------------------------*/
+
 void get_network_test_report(char *buf, int bufsize) {
   strncpy(buf, s_report, bufsize - 1);
   buf[bufsize - 1] = '\0';

@@ -1,7 +1,4 @@
-/*
- * WiiMedic - ios_check.c
- * Scans all installed IOS versions, detects stubs, patches, and issues
- */
+// ios_check.c - scans every IOS on the system, flags stubs and cIOS
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,18 +11,21 @@
 
 #define MAX_REPORT 8192
 
-/*---------------------------------------------------------------------------*/
+
 static bool is_known_stub_revision(u32 slot, u32 revision) {
     if (revision == 0) return true;
+    /* rev 65280 (0xFF00) is a well-documented Nintendo stub placeholder */
+    if (revision == 65280) return true;
+    /* cIOS slots are identified by slot number, not revision */
     switch (slot) {
-        case 222: case 223: case 249: case 250:
+        case 222: case 223: case 249: case 250: case 251:
             return false;
-        default: break;
+        default:
+            return false;
     }
-    return false;
 }
 
-/*---------------------------------------------------------------------------*/
+
 static const char* get_ios_description(u32 slot) {
     switch (slot) {
         case 9:  case 12: case 13: case 14:
@@ -45,8 +45,9 @@ static const char* get_ios_description(u32 slot) {
                             return "Used by newer games";
         case 70:            return "System Menu 4.1K+";
         case 80:            return "System Menu 4.3";
+        case 119:           return "Used by some games";
         case 222: case 223: return "cIOS (if present)";
-        case 236:           return "BootMii IOS";
+        case 236:           return "cIOS installer slot";
         case 249: case 250: return "cIOS d2x/Waninkoko";
         case 251:           return "cIOS (if present)";
         case 254:           return "BootMii IOS";
@@ -60,7 +61,7 @@ static int  s_total_ios = 0;
 static int  s_stub_count = 0;
 static int  s_cios_count = 0;
 
-/*---------------------------------------------------------------------------*/
+
 void run_ios_check(void) {
     u32 title_count = 0;
     s32 ret;
@@ -212,7 +213,7 @@ void run_ios_check(void) {
     ui_draw_ok("IOS scan complete");
 }
 
-/*---------------------------------------------------------------------------*/
+
 void get_ios_check_report(char *buf, int bufsize) {
     strncpy(buf, s_report, bufsize - 1);
     buf[bufsize - 1] = '\0';

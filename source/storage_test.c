@@ -1,7 +1,4 @@
-/*
- * WiiMedic - storage_test.c
- * Benchmarks SD card and USB drive read/write speeds
- */
+// storage_test.c - benchmarks SD card and USB drive read/write speeds
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,23 +14,22 @@
 #include "storage_test.h"
 #include "ui_common.h"
 
-/* Test parameters */
-#define TEST_FILE_SIZE    (1024 * 1024)  /* 1 MB */
-#define TEST_BLOCK_SIZE   (32 * 1024)    /* 32 KB */
-#define TEST_ITERATIONS   3
-#define SPEED_GOOD_KB     2000
-#define SPEED_OK_KB       1000
+#define TEST_FILE_SIZE   (1024 * 1024)  // 1MB test file
+#define TEST_BLOCK_SIZE  (32 * 1024)    // 32KB chunks
+#define TEST_ITERATIONS  3              // average over 3 runs
+#define SPEED_GOOD_KB    2000           // above this = good
+#define SPEED_OK_KB      1000           // above this = acceptable
 
 static char s_report[4096];
 
-/*---------------------------------------------------------------------------*/
+
 static bool check_device_present(const char *path) {
     DIR *dir = opendir(path);
     if (dir) { closedir(dir); return true; }
     return false;
 }
 
-/*---------------------------------------------------------------------------*/
+
 static void get_device_info(const char *device_name, const char *path) {
     DIR *dir = opendir(path);
     struct dirent *entry;
@@ -72,12 +68,13 @@ static void get_device_info(const char *device_name, const char *path) {
     /* Check for /apps */
     {
         char appspath[256];
+        struct dirent *apps_entry;
         snprintf(appspath, sizeof(appspath), "%s/apps", path);
         DIR *apps = opendir(appspath);
         if (apps) {
             int app_count = 0;
-            while ((entry = readdir(apps)) != NULL) {
-                if (entry->d_name[0] != '.') app_count++;
+            while ((apps_entry = readdir(apps)) != NULL) {
+                if (apps_entry->d_name[0] != '.') app_count++;
             }
             closedir(apps);
             snprintf(buf, sizeof(buf), "%d homebrew apps found", app_count);
@@ -86,7 +83,7 @@ static void get_device_info(const char *device_name, const char *path) {
     }
 }
 
-/*---------------------------------------------------------------------------*/
+
 static void run_benchmark(const char *device_name, const char *base_path) {
     char testpath[256];
     int blocks = TEST_FILE_SIZE / TEST_BLOCK_SIZE;
@@ -120,8 +117,16 @@ static void run_benchmark(const char *device_name, const char *base_path) {
             return;
         }
         start = gettime();
-        for (i = 0; i < blocks; i++)
-            fwrite(buffer, 1, TEST_BLOCK_SIZE, fp);
+        for (i = 0; i < blocks; i++) {
+            size_t written = fwrite(buffer, 1, TEST_BLOCK_SIZE, fp);
+            if ((int)written != TEST_BLOCK_SIZE) {
+                ui_draw_err("Write error during benchmark - storage may be full or faulty");
+                fclose(fp);
+                free(buffer);
+                remove(testpath);
+                return;
+            }
+        }
         fflush(fp);
         fclose(fp);
         end = gettime();
@@ -143,8 +148,16 @@ static void run_benchmark(const char *device_name, const char *base_path) {
         u64 start, end;
         if (!fp) { ui_draw_err("Cannot open test file for reading"); break; }
         start = gettime();
-        for (i = 0; i < blocks; i++)
-            fread(buffer, 1, TEST_BLOCK_SIZE, fp);
+        for (i = 0; i < blocks; i++) {
+            size_t got = fread(buffer, 1, TEST_BLOCK_SIZE, fp);
+            if ((int)got != TEST_BLOCK_SIZE) {
+                ui_draw_err("Read error during benchmark");
+                fclose(fp);
+                free(buffer);
+                remove(testpath);
+                return;
+            }
+        }
         fclose(fp);
         end = gettime();
         read_total_ticks += (end - start);
@@ -191,7 +204,7 @@ static void run_benchmark(const char *device_name, const char *base_path) {
     }
 }
 
-/*---------------------------------------------------------------------------*/
+
 void run_storage_test(void) {
     int rpos = 0;
     bool sd_present, usb_present;
@@ -245,7 +258,7 @@ void run_storage_test(void) {
     ui_draw_ok("Storage test complete");
 }
 
-/*---------------------------------------------------------------------------*/
+
 void get_storage_test_report(char *buf, int bufsize) {
     strncpy(buf, s_report, bufsize - 1);
     buf[bufsize - 1] = '\0';

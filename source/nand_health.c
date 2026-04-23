@@ -1,7 +1,5 @@
-/*
- * WiiMedic - nand_health.c
- * NAND filesystem health check - scans for usage, free space, and issues
- */
+// nand_health.c - scans the Wii NAND for space usage and issues
+// gives a health score out of 100 which I think is a nice touch
 
 #include <gccore.h>
 #include <ogc/isfs.h>
@@ -13,9 +11,9 @@
 #include "nand_health.h"
 #include "ui_common.h"
 
-/* NAND constants (Wii: 4096 blocks * 8 clusters/block = 32768 clusters) */
+// wii NAND: 512MB raw, exposed as 32768 clusters at 16KB each, 6143 inodes
 #define NAND_TOTAL_CLUSTERS 32768
-#define NAND_TOTAL_INODES 6143
+#define NAND_TOTAL_INODES   6143
 
 /* State for report */
 static u32 s_used_inodes = 0;
@@ -26,8 +24,12 @@ static int s_health_score = 100;
 static char s_health_status[64] = "Unknown";
 static int s_title_count = 0;
 static int s_ticket_count = 0;
+static bool s_nand_run = false;
 
-/*---------------------------------------------------------------------------*/
+
+bool has_nand_health_run(void) { return s_nand_run; }
+
+
 static int count_nand_entries(const char *path) {
   char pathbuf[ISFS_MAXPATH] ATTRIBUTE_ALIGN(32);
   u32 count = 0;
@@ -41,10 +43,10 @@ static int count_nand_entries(const char *path) {
   return (int)count;
 }
 
-/*---------------------------------------------------------------------------*/
+
 void run_nand_health(void) {
   s32 ret;
-  float cluster_pct, inode_pct;
+  float cluster_pct = 0.0f, inode_pct = 0.0f;
 
   ui_draw_info("Initializing NAND filesystem scan...");
   ui_printf("\n");
@@ -208,26 +210,22 @@ void run_nand_health(void) {
     }
   }
 
-  /* Recommendations */
-  {
-    float cluster_pct2 =
-        (float)s_used_blocks * 100.0f / (float)NAND_TOTAL_CLUSTERS;
-    float inode_pct2 = (float)s_used_inodes * 100.0f / (float)NAND_TOTAL_INODES;
-
-    if (cluster_pct2 > 85.0f)
+    /* Recommendations */
+    if (cluster_pct > 85.0f)
       ui_draw_info("Consider removing unused channels to free space");
-    if (inode_pct2 > 85.0f)
+    if (inode_pct > 85.0f)
       ui_draw_info("Too many files on NAND - consider cleanup");
-  }
 
   ui_printf("\n");
   ui_draw_ok("NAND health check complete");
 
   if (we_initialized)
     ISFS_Deinitialize();
+
+  s_nand_run = true;
 }
 
-/*---------------------------------------------------------------------------*/
+
 void get_nand_health_report(char *buf, int bufsize) {
   snprintf(buf, bufsize,
            "=== NAND HEALTH CHECK ===\n"

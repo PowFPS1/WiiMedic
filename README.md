@@ -102,7 +102,6 @@ make dist
 - **NAND caching** — report generator no longer re-runs the full NAND scan if you already ran it from the menu
 - **Priiloader info cached** — system info collects brick protection data once and reuses it, eliminating redundant ISFS I/O cycles
 - **8KB stack buffer made static** — avoids a large stack frame in the report generator
-- **Code cleaned up** — removed formal dividers and corporate-style comments throughout, reads more like a person wrote it
 
 full changelog at the bottom if you want all the details.
 
@@ -140,7 +139,6 @@ built with [devkitPro](https://devkitpro.org/) and [libogc](https://github.com/d
 - Report generator skips NAND re-scan if already cached
 - Priiloader/BootMii detection cached at module level (eliminates redundant ISFS I/O)
 - 8KB section buffer in report generator changed to static
-- Code style pass: removed formal dividers and corporate comments across all source files
 
 ### v1.2.0
 - Priiloader version detection (reads version string from NAND binary directly)

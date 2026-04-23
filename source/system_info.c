@@ -1,7 +1,4 @@
-/*
- * WiiMedic - system_info.c
- * Displays comprehensive system hardware and firmware information
- */
+// system_info.c - collects hardware and firmware details about the Wii
 
 #include <dirent.h>
 #include <gccore.h>
@@ -16,18 +13,16 @@
 #include "system_info.h"
 #include "ui_common.h"
 
-/*---------------------------------------------------------------------------*/
+
 
 #define SM_ID (u64)0x0000000100000002ULL
 
 /* ISFS error code for already initialized */
 #define ISFS_EALREADY -105
 
-/*
- * Helper to get the System Menu boot content ID by parsing its TMD.
- * Inspired by Priiloader, thanks DacoTaco
- * Returns the CID on success, 0 on failure.
- */
+// get the content ID for whatever the system menu is currently booting
+// priiloader replaces this with its own loader, so checking this is how we detect it
+// credit to DacoTaco (priiloader) for the approach
 static u32 get_SM_boot_content_id(void) {
   u32 tmd_size = 0;
   if (ES_GetStoredTMDSize(SM_ID, &tmd_size) < 0 || tmd_size == 0)
@@ -55,11 +50,7 @@ static u32 get_SM_boot_content_id(void) {
   return content_id;
 }
 
-/*
- * Helper to check for Priiloader presence.
- * Returns true if any Priiloader-related files or the backup System Menu are
- * found.
- */
+// check if priiloader is installed by looking for its config files or backup app
 static bool detect_priiloader(void) {
   u32 content_id = get_SM_boot_content_id();
   if (content_id == 0)
@@ -107,10 +98,8 @@ static bool detect_priiloader(void) {
   return detected;
 }
 
-/*
- * Scans the active System Menu binary (Priiloader) for its version string.
- * Special thanks and credit to Abdelali221 for creating the version shower!
- */
+// scan the active system menu binary for priiloader's version string
+// credit to Abdelali221 for figuring out where to look in the binary
 static void get_priiloader_version(char *out_version, int max_len) {
   strncpy(out_version, "Unknown", max_len);
 
@@ -140,13 +129,18 @@ static void get_priiloader_version(char *out_version, int max_len) {
               (buf[i] == 'v' && buf[i + 1] == '0' && buf[i + 2] == '.')) {
             strncpy(out_version, (char *)&buf[i], max_len - 1);
             out_version[max_len - 1] = '\0';
-            for (int j = 0; j < strlen(out_version); j++) {
-              if (out_version[j] < 0x20 || out_version[j] > 0x7E) {
-                out_version[j] = '\0';
-                break;
+            /* Sanitize: truncate at first non-printable byte */
+            {
+              int slen = (int)strnlen(out_version, max_len);
+              int j;
+              for (j = 0; j < slen; j++) {
+                if (out_version[j] < 0x20 || out_version[j] > 0x7E) {
+                  out_version[j] = '\0';
+                  break;
+                }
               }
             }
-            if (strlen(out_version) > 3) {
+            if ((int)strlen(out_version) > 3) {
               found = true;
               break;
             }
@@ -162,6 +156,7 @@ static void get_priiloader_version(char *out_version, int max_len) {
     ISFS_Deinitialize();
   }
 }
+
 
 static bool detect_bootmii_ios(void) {
   u32 tmd_size = 0;
@@ -226,7 +221,24 @@ static int get_boot1_bootmii_compatible(void) {
   return 2;   /* unknown */
 }
 
-/*---------------------------------------------------------------------------*/
+// cache the brick protection stuff so we don't hit the filesystem repeatedly
+static bool s_protection_cached  = false;
+static bool s_has_priiloader     = false;
+static char s_priiloader_ver[32] = "";
+static bool s_has_bootmii_ios    = false;
+static int  s_boot1_ok           = -2; // -2 = not checked yet
+
+static void collect_protection_info(void) {
+  if (s_protection_cached)
+    return;
+  s_has_priiloader = detect_priiloader();
+  if (s_has_priiloader)
+    get_priiloader_version(s_priiloader_ver, sizeof(s_priiloader_ver));
+  s_boot1_ok        = get_boot1_bootmii_compatible();
+  s_has_bootmii_ios = detect_bootmii_ios();
+  s_protection_cached = true;
+}
+
 static const char *get_region_string(void) {
   switch (CONF_GetRegion()) {
   case CONF_REGION_JP:
@@ -304,7 +316,7 @@ static const char *get_progressive_string(void) {
   return "Unknown";
 }
 
-/*---------------------------------------------------------------------------*/
+
 void run_system_info(void) {
   u32 hollywood_ver = SYS_GetHollywoodRevision();
   u32 mem1_size = SYS_GetArena1Size();
@@ -368,17 +380,14 @@ void run_system_info(void) {
 
   ui_draw_section("Brick Protection");
   {
-    bool has_priiloader = detect_priiloader();
-    int boot1_ok = get_boot1_bootmii_compatible();
-    bool boot2_suggests_bootmii_ok = (ret >= 0 && boot2_version <= 4);
-    bool has_bootmii_ios = detect_bootmii_ios();
     int protection_count = 0;
 
-    if (has_priiloader) {
+    collect_protection_info();
+
+    if (s_has_priiloader) {
       ui_draw_kv_color("Priiloader", UI_BGREEN, "Installed");
-      char p_ver[32];
-      get_priiloader_version(p_ver, sizeof(p_ver));
-      ui_printf("   " UI_BCYAN "(i) " UI_WHITE " %s\n" UI_RESET, p_ver);
+      ui_printf("   " UI_BCYAN "(i) " UI_WHITE " %s\n" UI_RESET,
+                s_priiloader_ver);
       protection_count++;
     } else {
       ui_draw_kv_color("Priiloader", UI_BRED, "Not found");
@@ -387,16 +396,17 @@ void run_system_info(void) {
     if (hollywood_ver >= 0x21) {
       ui_draw_kv_color("BootMii (boot2)", UI_BYELLOW,
                        "Not compatible (Late HW)");
-    } else if (boot1_ok == 1) {
+    } else if (s_boot1_ok == 1) {
       ui_draw_kv_color("BootMii (boot2)", UI_BGREEN, "Compatible (boot1a/b)");
       protection_count++;
-    } else if (boot1_ok == 0) {
+    } else if (s_boot1_ok == 0) {
       ui_draw_kv_color("BootMii (boot2)", UI_BYELLOW,
                        "Not compatible (boot1c/d)");
-    } else if (boot1_ok == 2) {
+    } else if (s_boot1_ok == 2) {
       ui_draw_kv_color("BootMii (boot2)", UI_BYELLOW, "Unknown boot1 revision");
     } else {
       /* Fallback logic if OTP read failed */
+      bool boot2_suggests_bootmii_ok = (ret >= 0 && boot2_version <= 4);
       if (boot2_suggests_bootmii_ok) {
         ui_draw_kv_color("BootMii (boot2)", UI_BGREEN,
                          "Likely compatible (boot2 proxy)");
@@ -406,7 +416,7 @@ void run_system_info(void) {
       }
     }
 
-    if (has_bootmii_ios) {
+    if (s_has_bootmii_ios) {
       ui_draw_kv_color("BootMii (IOS)", UI_BGREEN, "Installed");
       protection_count++;
     } else {
@@ -427,7 +437,7 @@ void run_system_info(void) {
   ui_draw_ok("System information collected successfully");
 }
 
-/*---------------------------------------------------------------------------*/
+
 void get_system_info_report(char *buf, int bufsize) {
   u32 hollywood_ver = SYS_GetHollywoodRevision();
   u32 mem1_size = SYS_GetArena1Size();
@@ -442,42 +452,37 @@ void get_system_info_report(char *buf, int bufsize) {
   ES_GetDeviceID(&device_id);
 
   {
-    bool has_priiloader = detect_priiloader();
-    int boot1_ok = get_boot1_bootmii_compatible();
-    bool boot2_suggests_ok = (boot2_ret >= 0 && boot2_version <= 4);
-    bool has_bootmii_ios = detect_bootmii_ios();
+    collect_protection_info();
 
-    /* Logic correction: boot1 compatible means boot2 install is possible */
-    bool has_bootmii_boot2 = (boot1_ok == 1);
-
-    char p_ver[32] = "";
-    if (has_priiloader) {
-      get_priiloader_version(p_ver, sizeof(p_ver));
-    }
-    char prii_str[64];
-    if (has_priiloader) {
-      snprintf(prii_str, sizeof(prii_str), "Installed (%s)", p_ver);
-    } else {
-      strcpy(prii_str, "Not found");
-    }
+    bool has_bootmii_boot2 = (s_boot1_ok == 1);
 
     const char *boot2_str;
     if (hollywood_ver >= 0x21)
       boot2_str = "Not compatible (Late HW)";
-    else if (boot1_ok == 1)
+    else if (s_boot1_ok == 1)
       boot2_str = "Compatible (boot1a/b)";
-    else if (boot1_ok == 0)
+    else if (s_boot1_ok == 0)
       boot2_str = "Not compatible (boot1c/d)";
-    else if (boot1_ok == 2)
+    else if (s_boot1_ok == 2)
       boot2_str = "Unknown boot1 revision";
-    else
+    else {
+      bool boot2_suggests_ok = (boot2_ret >= 0 && boot2_version <= 4);
       boot2_str = boot2_suggests_ok ? "Likely compatible (boot2 proxy)"
                                     : "Likely not (boot2 v5+)";
+    }
+
+    char prii_str[64];
+    if (s_has_priiloader)
+      snprintf(prii_str, sizeof(prii_str), "Installed (%s)", s_priiloader_ver);
+    else
+      strcpy(prii_str, "Not found");
 
     const char *rating =
-        (has_priiloader && (has_bootmii_boot2 || has_bootmii_ios)) ? "GOOD"
-        : (has_priiloader || has_bootmii_ios || has_bootmii_boot2) ? "PARTIAL"
-                                                                   : "NONE";
+        (s_has_priiloader && (has_bootmii_boot2 || s_has_bootmii_ios))
+            ? "GOOD"
+        : (s_has_priiloader || s_has_bootmii_ios || has_bootmii_boot2)
+            ? "PARTIAL"
+            : "NONE";
 
     snprintf(buf, bufsize,
              "=== SYSTEM INFORMATION ===\n"
@@ -503,6 +508,6 @@ void get_system_info_report(char *buf, int bufsize) {
              get_language_string(), get_aspect_string(),
              get_progressive_string(), hollywood_ver, device_id, boot2_version,
              ios_ver, ios_rev, mem1_size / 1024, mem2_size / 1024, prii_str,
-             boot2_str, has_bootmii_ios ? "Installed" : "Not found", rating);
+             boot2_str, s_has_bootmii_ios ? "Installed" : "Not found", rating);
   }
 }

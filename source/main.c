@@ -1,8 +1,3 @@
-/*
- * WiiMedic - main.c
- * Application entry point and polished menu system
- * All UI uses ASCII-safe characters only
- */
 
 #include <fat.h>
 #include <gccore.h>
@@ -21,7 +16,7 @@
 #include "system_info.h"
 #include "ui_common.h"
 
-/* Menu configuration */
+// how many items in the main menu
 #define MENU_ITEMS 8
 
 static const char *menu_labels[MENU_ITEMS] = {
@@ -30,6 +25,7 @@ static const char *menu_labels[MENU_ITEMS] = {
     "Controller Diagnostics",     "Network Connectivity Test",
     "Generate Full Report to SD", "Exit to Homebrew Channel"};
 
+// one-liner description shown at the bottom when an item is highlighted
 static const char *menu_descs[MENU_ITEMS] = {
     "Hardware revision, firmware, region, video mode, memory",
     "Scan NAND for space usage, file counts, and health score",
@@ -43,7 +39,8 @@ static const char *menu_descs[MENU_ITEMS] = {
 static void *xfb = NULL;
 static GXRModeObj *rmode = NULL;
 
-/*---------------------------------------------------------------------------*/
+
+// boring but necessary video init
 static void init_video(void) {
   VIDEO_Init();
   rmode = VIDEO_GetPreferredMode(NULL);
@@ -61,7 +58,8 @@ static void init_video(void) {
     VIDEO_WaitVSync();
 }
 
-/*---------------------------------------------------------------------------*/
+
+// draw the menu - highlights the selected item and shows its description
 static void draw_menu(int selected) {
   int i;
 
@@ -84,7 +82,8 @@ static void draw_menu(int selected) {
   ui_draw_footer(NULL);
 }
 
-/*---------------------------------------------------------------------------*/
+
+// clear screen, run the module, then enter the scroll viewer
 static void run_subscreen(const char *title, void (*func)(void)) {
   ui_clear();
   ui_draw_banner();
@@ -96,7 +95,7 @@ static void run_subscreen(const char *title, void (*func)(void)) {
   ui_scroll_view(title);
 }
 
-/*---------------------------------------------------------------------------*/
+
 int main(int argc, char **argv) {
   int selected = 0;
   bool running = true;
@@ -183,7 +182,11 @@ int main(int argc, char **argv) {
   WPAD_Shutdown();
 
   if (exit_to_hbc) {
-    WII_LaunchTitle(0x0001000148415858ULL); // HBC title ID for HAXX
+    /* Try the two most common HBC title IDs: HAXX and JODI.
+     * If neither is installed, fall back to the Wii System Menu safely. */
+    if (WII_LaunchTitle(0x0001000148415858ULL) < 0) /* HAXX */
+      if (WII_LaunchTitle(0x000100014A4F4449ULL) < 0) /* JODI */
+        SYS_ResetSystem(SYS_RETURNTOMENU, 0, 0);
   } else {
     SYS_ResetSystem(SYS_RETURNTOMENU, 0, 0);
   }

@@ -1,7 +1,5 @@
-/*
- * WiiMedic - ui_common.c
- * Shared UI drawing functions - ASCII-safe for the Wii console font
- */
+// ui_common.c - all the drawing helpers, scroll buffer, status indicators
+// uses ASCII only - no unicode, the Wii console font doesn't have it
 
 #include <gccore.h>
 #include <stdarg.h>
@@ -13,10 +11,10 @@
 
 #define LINE_WIDTH 60
 
-/* Scroll buffer system */
+// scroll buffer - captures output from modules so the user can scroll through it
 #define SCROLL_MAX_LINES 256
-#define SCROLL_LINE_LEN 512
-#define SCROLL_VISIBLE 18
+#define SCROLL_LINE_LEN  512
+#define SCROLL_VISIBLE   18
 
 static char s_scroll_lines[SCROLL_MAX_LINES][SCROLL_LINE_LEN];
 static int s_scroll_count = 0;
@@ -24,7 +22,7 @@ static char s_scroll_cur[SCROLL_LINE_LEN];
 static int s_scroll_pos = 0;
 static bool s_scroll_active = false;
 
-/*---------------------------------------------------------------------------*/
+
 int ui_printf(const char *fmt, ...) {
   va_list args;
   char tmp[512];
@@ -58,10 +56,10 @@ int ui_printf(const char *fmt, ...) {
   return len;
 }
 
-/*---------------------------------------------------------------------------*/
+
 void ui_clear(void) { printf("\x1b[2J\x1b[0;0H"); }
 
-/*---------------------------------------------------------------------------*/
+
 void ui_draw_banner(void) {
   printf("\n");
   printf(
@@ -81,21 +79,20 @@ void ui_draw_banner(void) {
   printf("\n");
 }
 
-/*---------------------------------------------------------------------------*/
+
+// one draw call instead of 60 separate ones
 void ui_draw_line(void) {
-  int i;
-  ui_printf("  " UI_WHITE);
-  for (i = 0; i < LINE_WIDTH; i++)
-    ui_printf("-");
-  ui_printf("\n" UI_RESET);
+  ui_printf("  " UI_WHITE
+            "------------------------------------------------------------"
+            "\n" UI_RESET);
 }
 
-/*---------------------------------------------------------------------------*/
+
 void ui_draw_section(const char *title) {
   ui_printf("\n" UI_BCYAN "   --- %s ---\n\n" UI_RESET, title);
 }
 
-/*---------------------------------------------------------------------------*/
+
 void ui_draw_kv(const char *label, const char *value) {
   int label_len = (int)strlen(label);
   int dots = 30 - label_len;
@@ -109,7 +106,7 @@ void ui_draw_kv(const char *label, const char *value) {
   ui_printf(" " UI_BWHITE "%s\n" UI_RESET, value);
 }
 
-/*---------------------------------------------------------------------------*/
+
 void ui_draw_kv_color(const char *label, const char *color, const char *value) {
   int label_len = (int)strlen(label);
   int dots = 30 - label_len;
@@ -123,7 +120,7 @@ void ui_draw_kv_color(const char *label, const char *color, const char *value) {
   ui_printf(" %s%s\n" UI_RESET, color, value);
 }
 
-/*---------------------------------------------------------------------------*/
+
 void ui_draw_bar(u32 used, u32 total, int bar_width) {
   int filled = 0;
   float pct = 0.0f;
@@ -154,7 +151,7 @@ void ui_draw_bar(u32 used, u32 total, int bar_width) {
   ui_printf("] %s%.1f%%\n" UI_RESET, color, pct);
 }
 
-/*---------------------------------------------------------------------------*/
+
 void ui_draw_ok(const char *msg) {
   ui_printf("   " UI_BGREEN "[OK]" UI_RESET " %s\n", msg);
 }
@@ -171,7 +168,7 @@ void ui_draw_info(const char *msg) {
   ui_printf("   " UI_BCYAN "(i)" UI_RESET "  %s\n", msg);
 }
 
-/*---------------------------------------------------------------------------*/
+
 void ui_scroll_begin(void) {
   s_scroll_count = 0;
   s_scroll_pos = 0;
@@ -179,7 +176,7 @@ void ui_scroll_begin(void) {
   s_scroll_active = true;
 }
 
-/*---------------------------------------------------------------------------*/
+
 void ui_scroll_view(const char *title) {
   int offset = 0;
   int max_offset;
@@ -285,7 +282,7 @@ void ui_scroll_view(const char *title) {
   }
 }
 
-/*---------------------------------------------------------------------------*/
+
 void ui_draw_footer(const char *msg) {
   printf("\n");
   ui_draw_line();
@@ -296,7 +293,7 @@ void ui_draw_footer(const char *msg) {
            "[UP/DOWN] Navigate   [A] Select   [HOME] Exit\n" UI_RESET);
 }
 
-/*---------------------------------------------------------------------------*/
+
 void ui_wait_button(void) {
   printf("\n   " UI_WHITE "Press [A] or [B] to return to menu..." UI_RESET
          "\n");

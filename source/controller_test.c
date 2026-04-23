@@ -1,7 +1,4 @@
-/*
- * WiiMedic - controller_test.c
- * Tests GameCube controller ports and Wii Remote connections
- */
+// controller_test.c - reads GC controller and Wii Remote state, checks for drift
 
 #include <gccore.h>
 #include <math.h>
@@ -16,7 +13,7 @@
 static int s_gc_ports_detected = 0;
 static int s_wiimotes_detected = 0;
 
-/* Battery thresholds provided by dkosmari */
+// battery level thresholds - thanks to dkosmari for figuring these out
 static unsigned get_battery_bars(u8 raw) {
   if (raw >= 0x55)
     return 4;
@@ -29,29 +26,29 @@ static unsigned get_battery_bars(u8 raw) {
   return 0;
 }
 
-/*---------------------------------------------------------------------------*/
+
 static void test_gc_controllers(void) {
   int port;
   char buf[64];
+  u32 connected_mask;
 
   ui_draw_section("GameCube Controller Ports");
 
   s_gc_ports_detected = 0;
-  PAD_ScanPads();
+  connected_mask = PAD_ScanPads(); /* bitmask: bit N set = port N connected */
 
   for (port = 0; port < 4; port++) {
-    s16 stickX = PAD_StickX(port);
-    s16 stickY = PAD_StickY(port);
-    s16 cstickX = PAD_SubStickX(port);
-    s16 cstickY = PAD_SubStickY(port);
-    u16 btns = PAD_ButtonsHeld(port);
-    u8 trigL = PAD_TriggerL(port);
-    u8 trigR = PAD_TriggerR(port);
-
-    bool connected =
-        (stickX || stickY || cstickX || cstickY || btns || trigL || trigR);
+    bool connected = !!(connected_mask & (1 << port));
 
     if (connected) {
+      s16 stickX = PAD_StickX(port);
+      s16 stickY = PAD_StickY(port);
+      s16 cstickX = PAD_SubStickX(port);
+      s16 cstickY = PAD_SubStickY(port);
+      u16 btns = PAD_ButtonsHeld(port);
+      u8 trigL = PAD_TriggerL(port);
+      u8 trigR = PAD_TriggerR(port);
+
       s_gc_ports_detected++;
 
       snprintf(buf, sizeof(buf), "Port %d: CONNECTED", port + 1);
@@ -113,7 +110,7 @@ static void test_gc_controllers(void) {
   }
 }
 
-/*---------------------------------------------------------------------------*/
+
 static void test_wiimotes(void) {
   int chan;
   char buf[128];
@@ -122,9 +119,8 @@ static void test_wiimotes(void) {
 
   s_wiimotes_detected = 0;
 
-  /* Give the Bluetooth stack several frames to update connection state.
-     A single WPAD_ScanPads() is often not enough for WPAD_Probe()
-     to return accurate results. */
+// BT stack needs a few frames to settle before WPAD_Probe gives useful results
+// one scan is never enough, 30 frames seems to work consistently
   {
     int warmup;
     for (warmup = 0; warmup < 30; warmup++) {
@@ -246,7 +242,7 @@ static void test_wiimotes(void) {
   }
 }
 
-/*---------------------------------------------------------------------------*/
+
 void run_controller_test(void) {
   char buf[64];
 
@@ -276,21 +272,18 @@ void run_controller_test(void) {
   ui_draw_ok("Controller diagnostics complete");
 }
 
-/*---------------------------------------------------------------------------*/
+
 void scan_controllers_quick(void) {
   int warmup, chan, port;
 
-  /* GC controllers */
+  /* GC controllers - use PAD_ScanPads bitmask for reliable detection */
   s_gc_ports_detected = 0;
-  PAD_ScanPads();
-  for (port = 0; port < 4; port++) {
-    s16 stickX = PAD_StickX(port);
-    s16 stickY = PAD_StickY(port);
-    u16 btns = PAD_ButtonsHeld(port);
-    u8 trigL = PAD_TriggerL(port);
-    u8 trigR = PAD_TriggerR(port);
-    if (stickX || stickY || btns || trigL || trigR)
-      s_gc_ports_detected++;
+  {
+    u32 mask = PAD_ScanPads();
+    for (port = 0; port < 4; port++) {
+      if (mask & (1 << port))
+        s_gc_ports_detected++;
+    }
   }
 
   /* Wii Remotes - need warmup for BT stack */
@@ -306,7 +299,7 @@ void scan_controllers_quick(void) {
   }
 }
 
-/*---------------------------------------------------------------------------*/
+
 void get_controller_test_report(char *buf, int bufsize) {
   snprintf(buf, bufsize,
            "=== CONTROLLER DIAGNOSTICS ===\n"

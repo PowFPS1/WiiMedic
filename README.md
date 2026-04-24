@@ -11,6 +11,10 @@ Wii consoles are almost 20 years old now and things go wrong with them, sometime
 
 ---
 
+<img width="1477" height="812" alt="image" src="https://github.com/user-attachments/assets/ca5e2948-3398-40d0-ae9d-2b6278f13991" />
+
+---
+
 ## what it does
 
 **System Info** — shows you your firmware version, hardware revision, whether you have BootMii or Priiloader set up, and gives you an overall brick protection rating so you know how safe your console is if something goes wrong.

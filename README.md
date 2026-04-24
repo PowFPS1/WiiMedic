@@ -7,7 +7,7 @@
 
 ---
 
-Wii consoles are almost 20 years old now and things go wrong with them, sometimes it's obvious like it won't boot or the disc drive sounds like it's dying, but a lot of the time you just get weird behavior and you don't really know where to start and I found that really frustrating. I kept seeing people post on forums with barely any information like "my Wii is broken" and nobody could help them because nobody knew what was going on inside the console. That's why I built this, I wanted something that would just tell you everything at once so you could either fix it yourself or at least give someone useful information when you're asking for help.
+Wii consoles are almost 20 years old now and go wrong, sometimes it's obvious like it won't boot or the disc drive sounds like it's dying, however, sometimes you get weird behavior and you don't really know where to start and I found that really frustrating. I kept seeing people post on forums with barely any information like "my Wii is broken" and nobody could help them because nobody knew what was going on inside the console. That's why I built this, I wanted something that would just tell you everything at once so you could either fix it yourself or at least give someone useful information when you're asking for help.
 
 ---
 

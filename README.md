@@ -7,7 +7,7 @@
 
 ---
 
-Wii consoles are almost 20 years old now and occasionally things go wrong, sometimes it's obvious like it won't boot or the disc drive sounds like it's dying, however, sometimes you get weird behavior and you don't really know where to start and I found that really frustrating. I kept seeing people post on forums with barely any information like "my Wii is broken" and nobody could help them because nobody knew what was going on inside the console. That's why I built this, I wanted something that would just tell you everything at once so you could either fix it yourself or at least give someone useful information when you're asking for help.
+I built this because I got tired of not knowing what was going on with my Wii. You get some weird behavior, you go to a forum, and everyone asks the same questions, what firmware are you on, do you have BootMii, what does your NAND look like, and you just don't know because nothing told you. I wanted something that would just lay it all out at once so you could either fix it yourself or at least walk into a conversation with actual useful information instead of just "my Wii is broken."
 
 ---
 
@@ -18,19 +18,19 @@ Wii consoles are almost 20 years old now and occasionally things go wrong, somet
 
 ## what it does
 
-**System Info** — shows you your firmware version, hardware revision, whether you have BootMii or Priiloader set up, and gives you an overall brick protection rating so you know how safe your console is if something goes wrong.
+**System Info** — shows you your firmware version, hardware revision, whether you have BootMii or Priiloader set up, and gives you an overall brick protection rating so you know how safe your console actually is if something goes wrong.
 
-**NAND Check** — scans your NAND filesystem for leftover junk, space issues, and interrupted title installs that can cause problems down the line, gives you a health score out of 100 which I think is a nice touch.
+**NAND Check** — scans your NAND filesystem for leftover junk, space issues, and interrupted title installs that can cause problems down the line. gives you a health score out of 100 which I think is a nice touch honestly.
 
-**IOS Scan** — shows every IOS installed on your system including cIOS and stub configurations, this is really useful if you're having compatibility issues with specific games or homebrew and you don't know why.
+**IOS Scan** — shows every IOS installed on your system including cIOS and stub configurations, this is really useful if you're having compatibility issues with specific games or homebrew and you don't know why, I ran into this a lot.
 
-**Storage Speed Test** — benchmarks your SD card or USB drive and tells you whether it's actually fast enough for the homebrew you're trying to run, some stuff is pretty picky about that.
+**Storage Speed Test** — benchmarks your SD card or USB drive and tells you whether it's actually fast enough for the homebrew you're trying to run, some stuff is really picky about that and I didn't know that for a long time.
 
-**Controller Diagnostics** — live input monitor for GameCube controllers and Wii Remotes, checks battery level, stick drift, and whether the IR sensor is working. good for figuring out if a controller is broken or just needs to be recalibrated.
+**Controller Diagnostics** — live input monitor for GameCube controllers and Wii Remotes, checks battery level, stick drift, and whether the IR sensor is working. good for figuring out if a controller is actually broken or just needs to be recalibrated.
 
-**Network Test** — scans for nearby access points and pulls your WiFi module info like your MAC address, firmware version, channel info. the network stuff runs on a separate thread now so it won't freeze up and make you think the app crashed, that used to be a problem.
+**Network Test** — scans for nearby access points and pulls your WiFi module info like your MAC address, firmware version, channel info. the network stuff runs on a separate thread now so it won't freeze up and make you think the app crashed, that used to be a problem and it bothered me a lot.
 
-**Report Generator** — saves everything to `WiiMedic_Report.txt` on your SD card so you can share it wherever you're asking for help.
+**Report Generator** — saves everything to `WiiMedic_Report.txt` on your SD card so you can share it wherever you're asking for help. I tried to make it readable for people who aren't super into Wii stuff but detailed enough that people who are can actually use it, either way it's better than just saying "my Wii is broken" with no other context.
 
 ---
 
@@ -68,19 +68,13 @@ works with Wii Remote or GameCube controller, whichever you have plugged in.
 
 ## sharing a report
 
-run the diagnostics, go to Report Generator, save. then:
-
-1. pull the SD card out and stick it in your PC
-2. open `WiiMedic_Report.txt`
-3. paste it wherever you're getting help
-
-I tried to make the report readable for people who aren't super into Wii stuff, but detailed enough that people who are are able to use it to help you. I think its fairly well balanced but I'm not sure, it's better than nothing or just saying "my Wii is broken" with no other context.
+run the diagnostics, go to Report Generator, save. then just pull the SD card out, stick it in your PC, open `WiiMedic_Report.txt`, and paste it wherever you're getting help. that's really all there is to it.
 
 ---
 
 ## building from source
 
-you'll need devkitPro with devkitPPC installed, plus libogc 3.0.0+ and libfat, I won't pretend the setup is super easy but the devkitPro website walks you through it pretty well.
+you'll need devkitPro with devkitPPC installed, plus libogc 3.0.0+ and libfat. I won't pretend the setup is super easy but the devkitPro website walks you through it pretty well.
 
 ```bash
 export DEVKITPPC=/opt/devkitpro/devkitPPC
@@ -97,18 +91,18 @@ make dist
 
 ## what's new in v1.3.0
 
-- **Loading indicator** — report generation now shows a spinning `|/-\` animation during the steps that used to look frozen (system info and controller scan), so it's obvious something is happening
-- **Controller detection fixed** — a GC controller sitting at rest (no buttons held, sticks centered) no longer shows as "not detected"
-- **HBC exit fallback** — if the Homebrew Channel isn't installed under the usual title ID, it tries the alternate one and falls back to the Wii System Menu instead of crashing silently
-- **IOS stub detection improved** — rev 65280 (0xFF00) is now correctly flagged as a Nintendo stub placeholder
-- **IOS236 label corrected** — it's a cIOS installer slot, not BootMii IOS
-- **Storage benchmark hardened** — fread/fwrite return values are now checked and the benchmark aborts cleanly if storage fails mid-test
+- **Loading indicator** — report generation now shows a spinning animation during the steps that used to look frozen, so it's obvious something is actually happening and the app isn't dead
+- **Controller detection fixed** — a GC controller sitting at rest no longer shows as not detected, that was really annoying
+- **HBC exit fallback** — if the Homebrew Channel isn't installed under the usual title ID it tries the alternate one and falls back to the Wii System Menu instead of crashing silently
+- **IOS stub detection improved** — rev 65280 is now correctly flagged as a Nintendo stub placeholder
+- **IOS236 label corrected** — it's a cIOS installer slot, not BootMii IOS, my bad on that one
+- **Storage benchmark hardened** — the benchmark now aborts cleanly if storage fails mid-test
 - **Network functions use snprintf** — was using bare sprintf which is unsafe
 - **NAND caching** — report generator no longer re-runs the full NAND scan if you already ran it from the menu
-- **Priiloader info cached** — system info collects brick protection data once and reuses it, eliminating redundant ISFS I/O cycles
+- **Priiloader info cached** — eliminates redundant ISFS I/O cycles
 - **8KB stack buffer made static** — avoids a large stack frame in the report generator
 
-full changelog at the bottom if you want all the details.
+full changelog at the bottom.
 
 ---
 
@@ -125,9 +119,9 @@ works on all Wii models (RVL-001 and RVL-101) and Wii U vWii.
 
 developed by **PowFPS1**
 
-**Abdelali221** helped a lot with the WiFi card info and AP scanning, I genuinely could not have figured that part out without him.
+**Abdelali221** helped a lot with the WiFi card info and AP scanning.
 
-built with [devkitPro](https://devkitpro.org/) and [libogc](https://github.com/devkitPro/libogc). thanks to r/WiiHacks and GBAtemp for feedback and testing, I appreciate everyone who took the time to try it out and tell me what was broken.
+built with [devkitPro](https://devkitpro.org/) and [libogc](https://github.com/devkitPro/libogc). thanks to r/WiiHacks and GBAtemp for the feedback and testing.
 
 ---
 

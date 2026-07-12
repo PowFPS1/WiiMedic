@@ -2,6 +2,15 @@
   <img width="128" height="48" alt="WiiMedic logo" src="https://github.com/user-attachments/assets/39cc7069-1e13-48b3-b09f-b41841d0db1d" />
 </div>
 
+<div align="center">
+
+![Release](https://img.shields.io/github/v/release/PowFPS1/WiiMedic)
+![License](https://img.shields.io/github/license/PowFPS1/WiiMedic)
+![Platform](https://img.shields.io/badge/platform-Wii%20%7C%20vWii-8a2be2)
+![Stars](https://img.shields.io/github/stars/PowFPS1/WiiMedic)
+
+</div>
+
 # WiiMedic
 ### Wii System Diagnostic & Health Monitor — v1.3.0
 
@@ -13,6 +22,14 @@ I built this because I got tired of not knowing what was going on with my Wii. Y
 
 <img width="1477" height="812" alt="image" src="https://github.com/user-attachments/assets/ca5e2948-3398-40d0-ae9d-2b6278f13991" />
 *Main menu running on Dolphin Emulator*
+
+---
+
+## requirements
+
+- Homebrew Channel installed
+- SD card or USB drive formatted as FAT32
+- Recommended: IOS58 (best NAND/ES access), but most IOS versions work fine
 
 ---
 
@@ -38,7 +55,7 @@ I built this because I got tired of not knowing what was going on with my Wii. Y
 
 just drop it in your apps folder like any other homebrew, nothing complicated about it.
 
-**SD card:** copy the `WiiMedic` folder to `SD:/apps/`  
+**SD card:** copy the `WiiMedic` folder to `SD:/apps/`
 **USB drive:** copy it to `USB:/apps/`
 
 the folder should look like this:
@@ -89,28 +106,11 @@ make dist
 
 ---
 
-## what's new in v1.3.0
-
-- **Loading indicator** — report generation now shows a spinning animation during the steps that used to look frozen, so it's obvious something is actually happening and the app isn't dead
-- **Controller detection fixed** — a GC controller sitting at rest no longer shows as not detected, that was really annoying
-- **HBC exit fallback** — if the Homebrew Channel isn't installed under the usual title ID it tries the alternate one and falls back to the Wii System Menu instead of crashing silently
-- **IOS stub detection improved** — rev 65280 is now correctly flagged as a Nintendo stub placeholder
-- **IOS236 label corrected** — it's a cIOS installer slot, not BootMii IOS, my bad on that one
-- **Storage benchmark hardened** — the benchmark now aborts cleanly if storage fails mid-test
-- **Network functions use snprintf** — was using bare sprintf which is unsafe
-- **NAND caching** — report generator no longer re-runs the full NAND scan if you already ran it from the menu
-- **Priiloader info cached** — eliminates redundant ISFS I/O cycles
-- **8KB stack buffer made static** — avoids a large stack frame in the report generator
-
-full changelog at the bottom.
-
----
-
 ## compatibility
 
 works on all Wii models (RVL-001 and RVL-101) and Wii U vWii.
 
-**Toolchain:** devkitPPC (GCC for PowerPC)  
+**Toolchain:** devkitPPC (GCC for PowerPC)
 **Libraries:** libogc, libfat, wiiuse, bte
 
 ---
@@ -125,19 +125,19 @@ built with [devkitPro](https://devkitpro.org/) and [libogc](https://github.com/d
 
 ---
 
-## full changelog
+## changelog
 
 ### v1.3.0
-- Loading spinner during report generation (system info step and controller scan step)
-- GC controller detection rewritten to use PAD_ScanPads() bitmask — idle controllers no longer show as disconnected
-- HBC exit now tries HAXX and JODI title IDs with Wii Menu fallback
-- IOS stub detection catches rev 65280 (0xFF00) Nintendo stub
-- IOS236 label corrected from "BootMii IOS" to "cIOS installer slot"
-- fread/fwrite return values checked in storage benchmark
-- sprintf → snprintf in network helper functions
-- Report generator skips NAND re-scan if already cached
-- Priiloader/BootMii detection cached at module level (eliminates redundant ISFS I/O)
-- 8KB section buffer in report generator changed to static
+- **Loading indicator** — report generation now shows a spinning animation during the steps that used to look frozen, so it's obvious something is actually happening and the app isn't dead
+- **Controller detection fixed** — a GC controller sitting at rest no longer shows as not detected, that was really annoying
+- **HBC exit fallback** — if the Homebrew Channel isn't installed under the usual title ID it tries the alternate one and falls back to the Wii System Menu instead of crashing silently
+- **IOS stub detection improved** — rev 65280 is now correctly flagged as a Nintendo stub placeholder
+- **IOS236 label corrected** — it's a cIOS installer slot, not BootMii IOS, my bad on that one
+- **Storage benchmark hardened** — the benchmark now aborts cleanly if storage fails mid-test
+- **Network functions use snprintf** — was using bare sprintf which is unsafe
+- **NAND caching** — report generator no longer re-runs the full NAND scan if you already ran it from the menu
+- **Priiloader info cached** — eliminates redundant ISFS I/O cycles
+- **8KB stack buffer made static** — avoids a large stack frame in the report generator
 
 ### v1.2.0
 - Priiloader version detection (reads version string from NAND binary directly)

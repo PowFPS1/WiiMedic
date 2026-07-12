@@ -138,15 +138,17 @@ built with [devkitPro](https://devkitpro.org/) and [libogc](https://github.com/d
 
 ## Changelog
 
+<details open>
+
 ### v1.3.1
-- **Loading spinner for all modules** — Every diagnostic screen now shows a live spinning animation while it's working, so you can tell it's running and not frozen. Previously only the report generator had this.
-- **HBC exit fixed** — Was only trying the ancient `HAXX` (beta) and `JODI` (2010) title IDs. Anyone running a standard modern HBC install (`LULZ`, v1.0.8+) got silently dumped to the System Menu instead of returning to HBC. Now tries `LULZ` → `OHBC` (vWii) → `JODI` → `HAXX` → System Menu fallback.
-- **NAND space reading fixed** — `ISFS_GetUsage` returns *free* counts, not used. The used/free values, health score, and bar graphs were all inverted (a nearly-full NAND showed as nearly-empty). Now correct.
-- **Report numbered filename fixed** — The alternate report path (`WiiMedic_Report_2.txt`, etc.) was being written to `sd://WiiMedic_Report_2.txt` (double slash) which some FAT implementations reject. Fixed.
-- **System info report rating fixed** — The brick protection rating in the saved report used a stricter BootMii/boot2 check than the live display, causing GOOD/PARTIAL mismatches. Both now use the same logic.
-- **Stub detection cleaned up** — `is_known_stub_revision()` had an unreachable dead-code switch block. Removed.
-- **Network module refactored** — IP config + connection test block was copy-pasted in two places. Extracted into a helper to eliminate divergence risk.
-- **Storage tips** — Added note that SD cards over 32GB must be FAT32, not exFAT.
+- **Loading spinner everywhere now** — Every diagnostic screen shows a live spinning animation while it's working now, not just the report generator. Same idea as before, just wasn't applied everywhere it should've been.
+- **HBC exit actually works now** — This one's kind of embarrassing, it was only trying the old `HAXX` (beta) and `JODI` (2010) title IDs, so if you were running a normal modern HBC install (`LULZ`, v1.0.8+) it would just dump you to the System Menu instead of taking you back to HBC like it's supposed to. Now it tries `LULZ` → `OHBC` (vWii) → `JODI` → `HAXX` → System Menu as a last resort.
+- **NAND space was backwards** — Turns out `ISFS_GetUsage` gives you free space, not used, and I had it flipped the whole time. Used/free numbers, health score, bar graphs, all of it was showing the opposite, so a NAND that was nearly full looked nearly empty. that's a pretty bad one to have shipped honestly, but it's fixed now.
+- **Numbered report filenames fixed** — The alternate report path was writing to `sd://WiiMedic_Report_2.txt` with a double slash, which some FAT implementations just reject. fixed.
+- **Brick rating mismatch fixed** — The rating in the saved report was using a stricter BootMii/boot2 check than what showed live on screen, so you could get GOOD on the display and PARTIAL in the report for no real reason. both use the same logic now.
+- **Cleaned up dead code** — `is_known_stub_revision()` Had a switch block that could never get hit. gone now.
+- **Network module refactored** — The IP config and connection test logic was copy-pasted in two spots, which is how bugs like the ones above happen, so I pulled it into one shared helper.
+- **Storage tips** — Added a note that SD cards over 32GB need to be FAT32, not exFAT, since that tend to trip people up.
 
 ### v1.3.0
 - **Loading indicator** — Report generation now shows a spinning animation during the steps that used to look frozen, so it's obvious something is actually happening and the app isn't dead

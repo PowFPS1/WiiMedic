@@ -62,19 +62,29 @@ void run_nand_health(void) {
     return;
   }
 
-  /* Get NAND filesystem usage (returns used clusters, used inodes) */
-  u32 used_clusters = 0, used_inodes = 0;
+  /* ISFS_GetUsage("/", ...) returns FREE clusters and FREE inodes, not used.
+   * Reference: wiibrew.org/wiki/IOS/Syscalls - ISFS_GetUsage.
+   * Subtract from totals to get used counts. */
+  u32 free_clusters = 0, free_inodes = 0;
 
-  ret = ISFS_GetUsage("/", &used_clusters, &used_inodes);
+  ret = ISFS_GetUsage("/", &free_clusters, &free_inodes);
   if (ret >= 0) {
-    s_used_blocks = used_clusters;
-    s_used_inodes = used_inodes;
+    s_free_blocks  = (free_clusters <= NAND_TOTAL_CLUSTERS)
+                         ? free_clusters : 0;
+    s_free_inodes  = (free_inodes  <= NAND_TOTAL_INODES)
+                         ? free_inodes  : 0;
+    s_used_blocks  = NAND_TOTAL_CLUSTERS - s_free_blocks;
+    s_used_inodes  = NAND_TOTAL_INODES   - s_free_inodes;
+  } else {
+    /* GetUsage failed - show a warning but continue with the directory scan */
+    char errmsg[64];
+    snprintf(errmsg, sizeof(errmsg), "ISFS_GetUsage failed (error %d) - space data N/A", ret);
+    ui_draw_warn(errmsg);
+    s_free_blocks = 0;
+    s_free_inodes = 0;
+    s_used_blocks = 0;
+    s_used_inodes = 0;
   }
-
-  s_free_inodes = NAND_TOTAL_INODES - s_used_inodes;
-  s_free_blocks = (s_used_blocks <= NAND_TOTAL_CLUSTERS)
-                      ? (NAND_TOTAL_CLUSTERS - s_used_blocks)
-                      : 0;
 
   /* Storage usage */
   ui_draw_section("NAND Storage Usage");

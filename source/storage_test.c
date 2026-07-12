@@ -251,6 +251,7 @@ void run_storage_test(void) {
     ui_draw_info("USB 2.0 drives recommended; USB 3.0 works at 2.0 speeds");
     ui_draw_info("SDHC cards (Class 10 / UHS-I) give best SD performance");
     ui_draw_info("Format USB as FAT32 (32KB clusters) or WBFS for games");
+    ui_draw_info("SD cards over 32GB must be formatted as FAT32 (not exFAT)");
 
     rpos += snprintf(s_report + rpos, sizeof(s_report) - rpos, "\n");
 

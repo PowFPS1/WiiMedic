@@ -27,36 +27,7 @@
 #define REPORT_PATH_SD  "sd:/WiiMedic_Report.txt"
 #define REPORT_PATH_USB "usb:/WiiMedic_Report.txt"
 
-// spinner shown during slow silent steps so it doesn't look frozen
-static volatile bool s_spin = false;
-static lwp_t s_spin_thd;
-static u8 s_spin_stk[4096] __attribute__((aligned(32)));
-
-static void *spinner_thread(void *arg) {
-  const char *frames = "|/-\\";
-  int f = 0;
-  (void)arg;
-  while (s_spin) {
-    printf("\r   " UI_BYELLOW "[%c]" UI_RESET " working on it...", frames[f & 3]);
-    f++;
-    int i;
-    for (i = 0; i < 6 && s_spin; i++)
-      VIDEO_WaitVSync();
-  }
-  printf("\r                              \r");
-  return NULL;
-}
-
-static void spin_start(void) {
-  s_spin = true;
-  LWP_CreateThread(&s_spin_thd, spinner_thread, NULL, s_spin_stk,
-                   sizeof(s_spin_stk), 80);
-}
-
-static void spin_stop(void) {
-  s_spin = false;
-  LWP_JoinThread(s_spin_thd, NULL);
-}
+// spinner is provided by ui_common (ui_spin_start / ui_spin_stop)
 
 static void report_append(FILE *fp, const char *fmt, ...) {
   if (!fp)
@@ -202,11 +173,11 @@ void run_report_generator(void) {
   if (existing_sd >= 0) {
     existing = existing_sd;
     save_path = REPORT_PATH_SD;
-    base_dir = "sd:/";
+    base_dir = "sd:";
   } else if (existing_usb >= 0) {
     existing = existing_usb;
     save_path = REPORT_PATH_USB;
-    base_dir = "usb:/";
+    base_dir = "usb:";
   }
 
   if (existing >= 0) {
@@ -257,10 +228,10 @@ void run_report_generator(void) {
 
   // step 1 - system info does ISFS reads which can hang for a couple seconds
   ui_printf(UI_BCYAN "   [1/6]" UI_WHITE " Collecting system information...\n" UI_RESET);
-  spin_start();
+  ui_spin_start("Collecting system info...");
   memset(section, 0, sizeof(section));
   get_system_info_report(section, sizeof(section));
-  spin_stop();
+  ui_spin_stop();
   report_append(fp, "%s", section);
   ui_draw_ok("Done.");
 
@@ -308,9 +279,9 @@ void run_report_generator(void) {
 
   // step 5 - controller scan has a 30-frame BT warmup that looks frozen without a spinner
   ui_printf(UI_BCYAN "   [5/6]" UI_WHITE " Checking controllers...\n" UI_RESET);
-  spin_start();
+  ui_spin_start("Scanning controllers...");
   scan_controllers_quick();
-  spin_stop();
+  ui_spin_stop();
   memset(section, 0, sizeof(section));
   get_controller_test_report(section, sizeof(section));
   report_append(fp, "%s", section);

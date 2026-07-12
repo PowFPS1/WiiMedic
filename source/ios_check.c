@@ -13,16 +13,11 @@
 
 
 static bool is_known_stub_revision(u32 slot, u32 revision) {
+    (void)slot; /* slot is not needed - cIOS classification is done in the caller */
     if (revision == 0) return true;
     /* rev 65280 (0xFF00) is a well-documented Nintendo stub placeholder */
     if (revision == 65280) return true;
-    /* cIOS slots are identified by slot number, not revision */
-    switch (slot) {
-        case 222: case 223: case 249: case 250: case 251:
-            return false;
-        default:
-            return false;
-    }
+    return false;
 }
 
 

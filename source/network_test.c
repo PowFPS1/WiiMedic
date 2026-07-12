@@ -68,7 +68,6 @@ static void ip_to_str(u32 ip, char *buf, size_t bufsize) {
            (ip >> 8) & 0xFF, ip & 0xFF);
 }
 
-
 static void mac_to_str(const u8 *mac, char *buf, size_t bufsize) {
   snprintf(buf, bufsize, "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1],
            mac[2], mac[3], mac[4], mac[5]);
@@ -309,6 +308,63 @@ static int do_ap_scan(int *rpos_ptr, u8 *scan_buf, s32 scan_ret) {
 }
 
 
+/*
+ * Show IP config and run TCP connectivity checks.
+ * Returns true if internet appears reachable.
+ * Called from two places (initial attempt + retry) to avoid code duplication.
+ */
+static bool run_connectivity_check(void) {
+  u32 ip = net_gethostip();
+  if (ip != 0) {
+    u8 first_octet = (ip >> 24) & 0xFF;
+    u8 second_octet = (ip >> 16) & 0xFF;
+    s_ip_obtained = true;
+    ip_to_str(ip, s_ip_str, sizeof(s_ip_str));
+
+    ui_draw_section("IP Configuration");
+    ui_draw_kv("IP Address", s_ip_str);
+    ui_draw_kv("Config Method", "Obtained via DHCP");
+
+    if (first_octet == 192 && second_octet == 168)
+      ui_draw_ok("Valid private IP range (192.168.x.x)");
+    else if (first_octet == 10)
+      ui_draw_ok("Valid private IP range (10.x.x.x)");
+    else if (first_octet == 172 && second_octet >= 16 && second_octet <= 31)
+      ui_draw_ok("Valid private IP range (172.16-31.x.x)");
+    else if (first_octet == 169 && second_octet == 254)
+      ui_draw_warn("Link-local IP (169.254.x.x) - DHCP may have failed");
+  } else {
+    ui_draw_section("IP Configuration");
+    ui_draw_err("No IP address obtained");
+    ui_draw_warn("WiFi connected but DHCP failed");
+  }
+
+  ui_draw_section("Connection Tests");
+  if (!s_ip_obtained) {
+    ui_printf("   " UI_WHITE "Skipping connection tests (no IP address)\n" UI_RESET);
+    return false;
+  }
+
+  bool dns_ok  = test_tcp_connection("Google DNS (8.8.8.8:53)", 0x08080808, 53);
+  bool http_ok = test_tcp_connection("HTTP Test (1.1.1.1:80)",  0x01010101, 80);
+  ui_printf("\n");
+
+  if (dns_ok && http_ok) {
+    ui_draw_ok("Internet connectivity: FULL");
+    ui_draw_info("Online services (Wiimmfi, WiiLink, etc.) should work");
+  } else if (dns_ok || http_ok) {
+    ui_draw_warn("Internet connectivity: PARTIAL");
+    ui_draw_info("Some services may not work correctly");
+  } else {
+    ui_draw_err("Internet connectivity: NONE");
+    ui_draw_warn("Connected to WiFi but cannot reach internet");
+    ui_draw_info("Check router settings / firewall");
+  }
+
+  return dns_ok || http_ok;
+}
+
+
 void run_network_test(void) {
   int rpos = 0;
   s32 ret;
@@ -375,53 +431,7 @@ void run_network_test(void) {
     s_wifi_working = true;
     ui_draw_ok("WiFi module initialized successfully");
 
-    ui_draw_section("IP Configuration");
-    {
-      u32 ip = net_gethostip();
-      if (ip != 0) {
-        u8 first_octet, second_octet;
-        s_ip_obtained = true;
-        ip_to_str(ip, s_ip_str, sizeof(s_ip_str));
-        ui_draw_kv("IP Address", s_ip_str);
-        ui_draw_kv("Config Method", "Obtained via DHCP");
-        first_octet = (ip >> 24) & 0xFF;
-        second_octet = (ip >> 16) & 0xFF;
-        if (first_octet == 192 && second_octet == 168)
-          ui_draw_ok("Valid private IP range (192.168.x.x)");
-        else if (first_octet == 10)
-          ui_draw_ok("Valid private IP range (10.x.x.x)");
-        else if (first_octet == 172 && second_octet >= 16 && second_octet <= 31)
-          ui_draw_ok("Valid private IP range (172.16-31.x.x)");
-        else if (first_octet == 169 && second_octet == 254)
-          ui_draw_warn("Link-local IP (169.254.x.x) - DHCP may have failed");
-      } else {
-        ui_draw_err("No IP address obtained");
-        ui_draw_warn("WiFi connected but DHCP failed");
-      }
-    }
-
-    ui_draw_section("Connection Tests");
-    if (s_ip_obtained) {
-      bool dns_ok =
-          test_tcp_connection("Google DNS (8.8.8.8:53)", 0x08080808, 53);
-      bool http_ok =
-          test_tcp_connection("HTTP Test (1.1.1.1:80)", 0x01010101, 80);
-      ui_printf("\n");
-      if (dns_ok && http_ok) {
-        ui_draw_ok("Internet connectivity: FULL");
-        ui_draw_info("Online services (Wiimmfi, WiiLink, etc.) should work");
-      } else if (dns_ok || http_ok) {
-        ui_draw_warn("Internet connectivity: PARTIAL");
-        ui_draw_info("Some services may not work correctly");
-      } else {
-        ui_draw_err("Internet connectivity: NONE");
-        ui_draw_warn("Connected to WiFi but cannot reach internet");
-        ui_draw_info("Check router settings / firewall");
-      }
-    } else {
-      ui_printf("   " UI_WHITE
-                "Skipping connection tests (no IP address)\n" UI_RESET);
-    }
+    run_connectivity_check();
 
     /* Release network so WD can use the radio */
     net_deinit();
@@ -589,54 +599,7 @@ void run_network_test(void) {
       s_wifi_working = true;
       ui_draw_ok("Network connected on retry");
 
-      ui_draw_section("IP Configuration");
-      {
-        u32 ip = net_gethostip();
-        if (ip != 0) {
-          u8 first_octet, second_octet;
-          s_ip_obtained = true;
-          ip_to_str(ip, s_ip_str, sizeof(s_ip_str));
-          ui_draw_kv("IP Address", s_ip_str);
-          ui_draw_kv("Config Method", "Obtained via DHCP");
-          first_octet = (ip >> 24) & 0xFF;
-          second_octet = (ip >> 16) & 0xFF;
-          if (first_octet == 192 && second_octet == 168)
-            ui_draw_ok("Valid private IP range (192.168.x.x)");
-          else if (first_octet == 10)
-            ui_draw_ok("Valid private IP range (10.x.x.x)");
-          else if (first_octet == 172 && second_octet >= 16 &&
-                   second_octet <= 31)
-            ui_draw_ok("Valid private IP range (172.16-31.x.x)");
-          else if (first_octet == 169 && second_octet == 254)
-            ui_draw_warn("Link-local IP (169.254.x.x) - DHCP may have failed");
-        } else {
-          ui_draw_err("No IP address obtained");
-          ui_draw_warn("WiFi connected but DHCP failed");
-        }
-      }
-
-      ui_draw_section("Connection Tests");
-      if (s_ip_obtained) {
-        bool dns_ok =
-            test_tcp_connection("Google DNS (8.8.8.8:53)", 0x08080808, 53);
-        bool http_ok =
-            test_tcp_connection("HTTP Test (1.1.1.1:80)", 0x01010101, 80);
-        ui_printf("\n");
-        if (dns_ok && http_ok) {
-          ui_draw_ok("Internet connectivity: FULL");
-          ui_draw_info("Online services (Wiimmfi, WiiLink, etc.) should work");
-        } else if (dns_ok || http_ok) {
-          ui_draw_warn("Internet connectivity: PARTIAL");
-          ui_draw_info("Some services may not work correctly");
-        } else {
-          ui_draw_err("Internet connectivity: NONE");
-          ui_draw_warn("Connected to WiFi but cannot reach internet");
-          ui_draw_info("Check router settings / firewall");
-        }
-      } else {
-        ui_printf("   " UI_WHITE
-                  "Skipping connection tests (no IP address)\n" UI_RESET);
-      }
+      run_connectivity_check();
 
       net_deinit();
     } else {

@@ -24,7 +24,7 @@ I built this because I got tired of not knowing what was going on with my Wii. Y
 
 ---
 
-## requirements
+## Requirements
 
 - Homebrew Channel installed
 - SD card or USB drive formatted as FAT32
@@ -32,27 +32,27 @@ I built this because I got tired of not knowing what was going on with my Wii. Y
 
 ---
 
-## what it does
+## What it does
 
-**System Info** — shows you your firmware version, hardware revision, whether you have BootMii or Priiloader set up, and gives you an overall brick protection rating so you know how safe your console actually is if something goes wrong.
+**System Info** — Shows you your firmware version, hardware revision, whether you have BootMii or Priiloader set up, and gives you an overall brick protection rating so you know how safe your console actually is if something goes wrong.
 
-**NAND Check** — scans your NAND filesystem for leftover junk, space issues, and interrupted title installs that can cause problems down the line. gives you a health score out of 100 which I think is a nice touch honestly.
+**NAND Check** — Scans your NAND filesystem for leftover junk, space issues, and interrupted title installs that can cause problems down the line. gives you a health score out of 100 which I think is a nice touch honestly.
 
-**IOS Scan** — shows every IOS installed on your system including cIOS and stub configurations, this is really useful if you're having compatibility issues with specific games or homebrew and you don't know why, I ran into this a lot.
+**IOS Scan** — Shows every IOS installed on your system including cIOS and stub configurations, this is really useful if you're having compatibility issues with specific games or homebrew and you don't know why, I ran into this a lot.
 
-**Storage Speed Test** — benchmarks your SD card or USB drive and tells you whether it's actually fast enough for the homebrew you're trying to run, some stuff is really picky about that and I didn't know that for a long time.
+**Storage Speed Test** — Benchmarks your SD card or USB drive and tells you whether it's actually fast enough for the homebrew you're trying to run, some stuff is really picky about that and I didn't know that for a long time.
 
-**Controller Diagnostics** — live input monitor for GameCube controllers and Wii Remotes, checks battery level, stick drift, and whether the IR sensor is working. good for figuring out if a controller is actually broken or just needs to be recalibrated.
+**Controller Diagnostics** — Live input monitor for GameCube controllers and Wii Remotes, checks battery level, stick drift, and whether the IR sensor is working. good for figuring out if a controller is actually broken or just needs to be recalibrated.
 
-**Network Test** — scans for nearby access points and pulls your WiFi module info like your MAC address, firmware version, channel info. the network stuff runs on a separate thread now so it won't freeze up and make you think the app crashed, that used to be a problem and it bothered me a lot.
+**Network Test** — Scans for nearby access points and pulls your WiFi module info like your MAC address, firmware version, channel info. the network stuff runs on a separate thread now so it won't freeze up and make you think the app crashed, that used to be a problem and it bothered me a lot.
 
-**Report Generator** — saves everything to `WiiMedic_Report.txt` on your SD card so you can share it wherever you're asking for help. I tried to make it readable for people who aren't super into Wii stuff but detailed enough that people who are can actually use it, either way it's better than just saying "my Wii is broken" with no other context.
+**Report Generator** — Saves everything to `WiiMedic_Report.txt` on your SD card so you can share it wherever you're asking for help. I tried to make it readable for people who aren't super into Wii stuff but detailed enough that people who are can actually use it, either way it's better than just saying "my Wii is broken" with no other context.
 
 ---
 
-## installation
+## Installation
 
-just drop it in your apps folder like any other homebrew, nothing complicated about it.
+Just drop it in your apps folder like any other homebrew, nothing complicated about it.
 
 **SD card:** copy the `WiiMedic` folder to `SD:/apps/`
 **USB drive:** copy it to `USB:/apps/`
@@ -65,11 +65,11 @@ the folder should look like this:
 └── icon.png
 ```
 
-launch it from the Homebrew Channel. I'd recommend running it under IOS58 if you can, it gives the best access to NAND and the ES functions, though it should work fine under most IOS versions.
+Launch it from the Homebrew Channel. I'd recommend running it under IOS58 if you can, it gives the best access to NAND and the ES functions, though it should work fine under most IOS versions.
 
 ---
 
-## controls
+## Controls
 
 | Button | Action |
 |--------|--------|
@@ -78,19 +78,19 @@ launch it from the Homebrew Channel. I'd recommend running it under IOS58 if you
 | B | Back to menu |
 | HOME / START (GC) | Exit to Wii System Menu |
 
-works with Wii Remote or GameCube controller, whichever you have plugged in.
+Works with Wii Remote or GameCube controller, whichever you have plugged in.
 
 ---
 
-## sharing a report
+## Sharing a report
 
-run the diagnostics, go to Report Generator, save. then just pull the SD card out, stick it in your PC, open `WiiMedic_Report.txt`, and paste it wherever you're getting help. that's really all there is to it.
+Run the diagnostics, go to Report Generator, save. then just pull the SD card out, stick it in your PC, open `WiiMedic_Report.txt`, and paste it wherever you're getting help. that's really all there is to it.
 
 ---
 
-## building from source
+## Building from source
 
-you'll need devkitPro with devkitPPC installed, plus libogc 3.0.0+ and libfat. I won't pretend the setup is super easy but the devkitPro website walks you through it pretty well.
+You'll need devkitPro with devkitPPC installed, plus libogc 3.0.0+ and libfat. I won't pretend the setup is super easy but the devkitPro website walks you through it pretty well.
 
 ```bash
 export DEVKITPPC=/opt/devkitpro/devkitPPC
@@ -105,18 +105,18 @@ make dist
 
 ---
 
-## compatibility
+## Compatibility
 
-works on all Wii models (RVL-001 and RVL-101) and Wii U vWii.
+Works on all Wii models (RVL-001 and RVL-101) and Wii U vWii.
 
 **Toolchain:** devkitPPC (GCC for PowerPC)
 **Libraries:** libogc, libfat, wiiuse, bte
 
 ---
 
-## credits
+## Credits
 
-developed by **PowFPS1**
+Developed by **PowFPS1**
 
 **Abdelali221** helped a lot with the WiFi card info and AP scanning.
 
@@ -124,19 +124,19 @@ built with [devkitPro](https://devkitpro.org/) and [libogc](https://github.com/d
 
 ---
 
-## changelog
+## Changelog
 
 ### v1.3.0
-- **Loading indicator** — report generation now shows a spinning animation during the steps that used to look frozen, so it's obvious something is actually happening and the app isn't dead
-- **Controller detection fixed** — a GC controller sitting at rest no longer shows as not detected, that was really annoying
-- **HBC exit fallback** — if the Homebrew Channel isn't installed under the usual title ID it tries the alternate one and falls back to the Wii System Menu instead of crashing silently
+- **Loading indicator** — Report generation now shows a spinning animation during the steps that used to look frozen, so it's obvious something is actually happening and the app isn't dead
+- **Controller detection fixed** — A GC controller sitting at rest no longer shows as not detected, that was really annoying
+- **HBC exit fallback** — If the Homebrew Channel isn't installed under the usual title ID it tries the alternate one and falls back to the Wii System Menu instead of crashing silently
 - **IOS stub detection improved** — rev 65280 is now correctly flagged as a Nintendo stub placeholder
-- **IOS236 label corrected** — it's a cIOS installer slot, not BootMii IOS, my bad on that one
-- **Storage benchmark hardened** — the benchmark now aborts cleanly if storage fails mid-test
-- **Network functions use snprintf** — was using bare sprintf which is unsafe
-- **NAND caching** — report generator no longer re-runs the full NAND scan if you already ran it from the menu
-- **Priiloader info cached** — eliminates redundant ISFS I/O cycles
-- **8KB stack buffer made static** — avoids a large stack frame in the report generator
+- **IOS236 label corrected** — It's a cIOS installer slot, not BootMii IOS, my bad on that one
+- **Storage benchmark hardened** — The benchmark now aborts cleanly if storage fails mid-test
+- **Network functions use snprintf** — Was using bare sprintf which is unsafe
+- **NAND caching** — Report generator no longer re-runs the full NAND scan if you already ran it from the menu
+- **Priiloader info cached** — Eliminates redundant ISFS I/O cycles
+- **8KB stack buffer made static** — Avoids a large stack frame in the report generator
 
 ### v1.2.0
 - Priiloader version detection (reads version string from NAND binary directly)

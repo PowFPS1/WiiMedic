@@ -5,7 +5,6 @@
 <div align="center">
 
 ![Release](https://img.shields.io/github/v/release/PowFPS1/WiiMedic)
-![License](https://img.shields.io/github/license/PowFPS1/WiiMedic)
 ![Platform](https://img.shields.io/badge/platform-Wii%20%7C%20vWii-8a2be2)
 ![Stars](https://img.shields.io/github/stars/PowFPS1/WiiMedic)
 

@@ -28,7 +28,7 @@ I built this because I got tired of not knowing what was going on with my Wii. Y
 
 Three things in v1.3.0 either weren't working right or were just wrong, so here's the fix release.
 
-**Every module now shows a loading spinner.** Previously you'd select something like the NAND check or IOS scan and the screen would just sit there until it was done. Looked kind of likea crash. Now there's a live animation the whole time so you know it's running.
+**Every module now shows a loading spinner.** Previously you'd select something like the NAND check or IOS scan and the screen would just sit there until it was done. Looked kind of like a crash. Now there's a live animation the whole time so you know it's running.
 
 **The HBC exit was broken for almost everyone.** "Exit to Homebrew Channel" was only trying two ancient title IDs from 2009. If you have a normal modern HBC install; which is basically everyone, it was falling back to the System Menu instead. Fixed to try the right IDs in the right order.
 

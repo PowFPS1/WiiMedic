@@ -138,7 +138,7 @@ built with [devkitPro](https://devkitpro.org/) and [libogc](https://github.com/d
 
 ## Changelog
 
-<details open>
+<details close>
 
 ### v1.3.1
 - **Loading spinner everywhere now** — Every diagnostic screen shows a live spinning animation while it's working now, not just the report generator. Same idea as before, just wasn't applied everywhere it should've been.

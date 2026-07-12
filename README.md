@@ -24,6 +24,18 @@ I built this because I got tired of not knowing what was going on with my Wii. Y
 
 ---
 
+## What's new in v1.3.1
+
+Three things in v1.3.0 either weren't working right or were flat out wrong, so here's the fix release.
+
+**Every module now shows a loading spinner.** Previously you'd select something like the NAND check or IOS scan and the screen would just sit there with no feedback until it was done. Looked exactly like a crash. Now there's a live animation the whole time so you know it's running.
+
+**The HBC exit was broken for almost everyone.** "Exit to Homebrew Channel" was only trying two ancient title IDs from 2009. If you have a normal modern HBC install — which is basically everyone — it was silently falling back to the System Menu instead. Fixed to try the right IDs in the right order.
+
+**The NAND health check was showing backwards data.** The function that reads NAND space usage returns *free* counts, not used counts. The code was treating them as used, so a nearly full NAND showed as nearly empty, the health score was wrong, and the bar graphs were mirrored. That's a significant bug and it's fixed now.
+
+---
+
 ## Requirements
 
 - Homebrew Channel installed

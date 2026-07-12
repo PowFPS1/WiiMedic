@@ -313,3 +313,48 @@ void ui_wait_button(void) {
     VIDEO_WaitVSync();
   }
 }
+
+
+/* -------------------------------------------------------------------------
+ * Spinner - runs on a background thread so the main thread can do work
+ * without the screen looking frozen.
+ * ------------------------------------------------------------------------- */
+#include <ogc/lwp.h>
+
+static volatile bool   s_spin_active = false;
+static lwp_t           s_spin_thread;
+static u8              s_spin_stack[4096] __attribute__((aligned(32)));
+static char            s_spin_msg[64] = "Working...";
+
+static void *spin_thread_func(void *arg) {
+  const char *frames = "|/-\\";
+  int f = 0;
+  (void)arg;
+  while (s_spin_active) {
+    printf("\r   " UI_BYELLOW "[%c]" UI_RESET " %s   ", frames[f & 3], s_spin_msg);
+    f++;
+    int i;
+    for (i = 0; i < 6 && s_spin_active; i++)
+      VIDEO_WaitVSync();
+  }
+  /* Erase the spinner line */
+  printf("\r                                                  \r");
+  return NULL;
+}
+
+void ui_spin_start(const char *msg) {
+  if (msg) {
+    strncpy(s_spin_msg, msg, sizeof(s_spin_msg) - 1);
+    s_spin_msg[sizeof(s_spin_msg) - 1] = '\0';
+  } else {
+    strncpy(s_spin_msg, "Working...", sizeof(s_spin_msg));
+  }
+  s_spin_active = true;
+  LWP_CreateThread(&s_spin_thread, spin_thread_func, NULL,
+                   s_spin_stack, sizeof(s_spin_stack), 80);
+}
+
+void ui_spin_stop(void) {
+  s_spin_active = false;
+  LWP_JoinThread(s_spin_thread, NULL);
+}

@@ -11,7 +11,7 @@
 </div>
 
 # WiiMedic
-### Wii System Diagnostic & Health Monitor — v1.3.0
+### Wii System Diagnostic & Health Monitor — v1.3.1
 
 ---
 
@@ -100,7 +100,7 @@ make
 to build a release zip:
 ```bash
 make dist
-# outputs WiiMedic_v1.3.0.zip, ready to attach to a GitHub Release
+# outputs WiiMedic_v1.3.1.zip, ready to attach to a GitHub Release
 ```
 
 ---
@@ -125,6 +125,16 @@ built with [devkitPro](https://devkitpro.org/) and [libogc](https://github.com/d
 ---
 
 ## Changelog
+
+### v1.3.1
+- **Loading spinner for all modules** — Every diagnostic screen now shows a live spinning animation while it's working, so you can tell it's running and not frozen. Previously only the report generator had this.
+- **HBC exit fixed** — Was only trying the ancient `HAXX` (beta) and `JODI` (2010) title IDs. Anyone running a standard modern HBC install (`LULZ`, v1.0.8+) got silently dumped to the System Menu instead of returning to HBC. Now tries `LULZ` → `OHBC` (vWii) → `JODI` → `HAXX` → System Menu fallback.
+- **NAND space reading fixed** — `ISFS_GetUsage` returns *free* counts, not used. The used/free values, health score, and bar graphs were all inverted (a nearly-full NAND showed as nearly-empty). Now correct.
+- **Report numbered filename fixed** — The alternate report path (`WiiMedic_Report_2.txt`, etc.) was being written to `sd://WiiMedic_Report_2.txt` (double slash) which some FAT implementations reject. Fixed.
+- **System info report rating fixed** — The brick protection rating in the saved report used a stricter BootMii/boot2 check than the live display, causing GOOD/PARTIAL mismatches. Both now use the same logic.
+- **Stub detection cleaned up** — `is_known_stub_revision()` had an unreachable dead-code switch block. Removed.
+- **Network module refactored** — IP config + connection test block was copy-pasted in two places. Extracted into a helper to eliminate divergence risk.
+- **Storage tips** — Added note that SD cards over 32GB must be FAT32, not exFAT.
 
 ### v1.3.0
 - **Loading indicator** — Report generation now shows a spinning animation during the steps that used to look frozen, so it's obvious something is actually happening and the app isn't dead

@@ -454,7 +454,8 @@ void get_system_info_report(char *buf, int bufsize) {
   {
     collect_protection_info();
 
-    bool has_bootmii_boot2 = (s_boot1_ok == 1);
+    bool has_bootmii_boot2 = (s_boot1_ok == 1) ||
+        (s_boot1_ok < 0 && boot2_ret >= 0 && boot2_version <= 4);
 
     const char *boot2_str;
     if (hollywood_ver >= 0x21)

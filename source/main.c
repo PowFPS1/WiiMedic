@@ -85,13 +85,17 @@ static void draw_menu(int selected) {
 
 // clear screen, run the module, then enter the scroll viewer
 static void run_subscreen(const char *title, void (*func)(void)) {
+  char spin_msg[80];
   ui_clear();
   ui_draw_banner();
   ui_draw_section(title);
-  printf(UI_WHITE "   Processing, please wait...\n" UI_RESET);
 
+  snprintf(spin_msg, sizeof(spin_msg), "Running %s...", title);
+  ui_spin_start(spin_msg);
   ui_scroll_begin();
   func();
+  ui_spin_stop();
+
   ui_scroll_view(title);
 }
 
@@ -182,11 +186,18 @@ int main(int argc, char **argv) {
   WPAD_Shutdown();
 
   if (exit_to_hbc) {
-    /* Try the two most common HBC title IDs: HAXX and JODI.
-     * If neither is installed, fall back to the Wii System Menu safely. */
-    if (WII_LaunchTitle(0x0001000148415858ULL) < 0) /* HAXX */
-      if (WII_LaunchTitle(0x000100014A4F4449ULL) < 0) /* JODI */
-        SYS_ResetSystem(SYS_RETURNTOMENU, 0, 0);
+    /* HBC title IDs in order of likelihood:
+     *   LULZ (0x4C554C5A) - v1.0.8 through current, installed by HackMii
+     *   OHBC (0x4F484243) - vWii (Wii U) version of HBC
+     *   JODI (0x4A4F4449) - v1.0.6-1.0.7 (old)
+     *   HAXX (0x48415858) - beta / v1.0.0-1.0.1 (very old)
+     * All use title type 0x00010001 (channel).
+     * Fall back to System Menu if none are installed. */
+    if (WII_LaunchTitle(0x000100014C554C5AULL) < 0) /* LULZ - modern HBC */
+      if (WII_LaunchTitle(0x000100014F484243ULL) < 0) /* OHBC - vWii HBC */
+        if (WII_LaunchTitle(0x000100014A4F4449ULL) < 0) /* JODI - old HBC */
+          if (WII_LaunchTitle(0x0001000148415858ULL) < 0) /* HAXX - very old */
+            SYS_ResetSystem(SYS_RETURNTOMENU, 0, 0);
   } else {
     SYS_ResetSystem(SYS_RETURNTOMENU, 0, 0);
   }

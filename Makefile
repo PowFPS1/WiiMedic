@@ -58,7 +58,7 @@ OFILES		:=	$(CFILES:$(SOURCES)/%.c=$(BUILD)/%.o) \
 				$(sFILES:$(SOURCES)/%.s=$(BUILD)/%.o) \
 				$(SFILES:$(SOURCES)/%.S=$(BUILD)/%.o)
 
-VERSION		:=	1.2.0
+VERSION		:=	1.3.0
 DIST_DIR	:=	$(CURDIR)/dist
 
 .PHONY: all clean dist install

@@ -10,7 +10,7 @@
 #include <gccore.h>
 
 /* App version */
-#define WIIMEDIC_VERSION "1.3.0"
+#define WIIMEDIC_VERSION "1.3.1"
 
 /* ANSI Color Codes - supported by libogc console */
 #define UI_RESET "\x1b[0m"
@@ -74,5 +74,10 @@ void ui_scroll_view(const char *title);
 
 /* Wait for A or B button press */
 void ui_wait_button(void);
+
+/* Spinner - shows an animated indicator with a message while work happens.
+ * ui_spin_start must be paired with ui_spin_stop. */
+void ui_spin_start(const char *msg);
+void ui_spin_stop(void);
 
 #endif /* _UI_COMMON_H_ */

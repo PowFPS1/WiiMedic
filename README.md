@@ -7,6 +7,7 @@
 ![Release](https://img.shields.io/github/v/release/PowFPS1/WiiMedic)
 ![Platform](https://img.shields.io/badge/platform-Wii%20%7C%20vWii-8a2be2)
 ![Stars](https://img.shields.io/github/stars/PowFPS1/WiiMedic)
+![Downloads](https://img.shields.io/github/downloads/PowFPS1/WiiMedic/total)
 
 </div>
 

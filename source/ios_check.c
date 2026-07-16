@@ -1,10 +1,13 @@
-// ios_check.c - scans every IOS on the system, flags stubs and cIOS
+// ios_check.c
+// scans every installed IOS slot, figures out what's a stub, what's real,
+// and what's a cIOS. mostly useful for diagnosing "why won't USB Loader GX work"
+// type problems.
 
+#include <gccore.h>
+#include <malloc.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <malloc.h>
-#include <gccore.h>
 
 #include "ios_check.h"
 #include "ui_common.h"
@@ -12,47 +15,52 @@
 #define MAX_REPORT 8192
 
 
-static bool is_known_stub_revision(u32 slot, u32 revision) {
-    (void)slot; /* slot is not needed - cIOS classification is done in the caller */
-    if (revision == 0) return true;
-    /* rev 65280 (0xFF00) is a well-documented Nintendo stub placeholder */
-    if (revision == 65280) return true;
+// revision 0 is always a stub, rev 65280 (0xFF00) is Nintendo's placeholder
+// revision used when they stub out an IOS slot intentionally
+static bool is_known_stub_revision(u32 revision) {
+    if (revision == 0)     return true;
+    if (revision == 65280) return true; // 0xFF00, classic Nintendo stub marker
     return false;
 }
 
 
-static const char* get_ios_description(u32 slot) {
+// semi-complete map of what each IOS slot is for.
+// this is based on years of collective knowledge from wiibrew.org and
+// various modding community docs. not guaranteed to be perfect.
+static const char *get_ios_description(u32 slot) {
     switch (slot) {
         case 9:  case 12: case 13: case 14:
         case 15: case 17: case 21: case 22:
-        case 28: return "System Menu";
-        case 30: case 31:  return "Channels / WiiConnect24";
+        case 28:          return "System Menu";
+        case 30: case 31: return "Channels / WiiConnect24";
         case 33: case 34: case 35: case 37: case 38:
-                            return "Used by many games";
-        case 36:            return "Used by many games (important!)";
-        case 50:            return "System Menu 4.0+";
-        case 51:            return "System Menu 4.1+";
-        case 52:            return "System Menu / MIOS";
+                          return "Used by many games";
+        case 36:          return "Used by many games (important)";
+        case 50:          return "System Menu 4.0+";
+        case 51:          return "System Menu 4.1+";
+        case 52:          return "System Menu / MIOS";
         case 53: case 55: case 56: case 57:
-                            return "System Menu 4.2+";
-        case 58:            return "System Menu 4.3";
+                          return "System Menu 4.2+";
+        case 58:          return "System Menu 4.3";
         case 59: case 60: case 61: case 62:
-                            return "Used by newer games";
-        case 70:            return "System Menu 4.1K+";
-        case 80:            return "System Menu 4.3";
-        case 119:           return "Used by some games";
-        case 222: case 223: return "cIOS (if present)";
-        case 236:           return "cIOS installer slot";
-        case 249: case 250: return "cIOS d2x/Waninkoko";
-        case 251:           return "cIOS (if present)";
-        case 254:           return "BootMii IOS";
-        default:            return "";
+                          return "Newer games";
+        case 70:          return "System Menu 4.1K+";
+        case 80:          return "System Menu 4.3";
+        case 119:         return "Some games";
+        case 222: case 223: return "cIOS slot";
+        case 236:         return "cIOS installer slot";
+        case 249: case 250: return "cIOS d2x / Waninkoko";
+        case 251:         return "cIOS slot";
+        case 254:         return "BootMii IOS";
+        default:          return "";
     }
 }
 
-/* Report state */
+
+// module state - stored so the report generator can pull it later
+// without having to re-run the scan
 static char s_report[MAX_REPORT];
-static int  s_total_ios = 0;
+static int  s_total_ios  = 0;
 static int  s_stub_count = 0;
 static int  s_cios_count = 0;
 
@@ -63,121 +71,115 @@ void run_ios_check(void) {
     u32 i;
     int rpos = 0;
 
-    ui_draw_info("Scanning installed IOS versions...");
+    ui_draw_info("Scanning installed IOS slots...");
     ui_printf("\n");
 
     ret = ES_GetNumTitles(&title_count);
     if (ret < 0 || title_count == 0) {
         char msg[64];
-        snprintf(msg, sizeof(msg), "Failed to enumerate titles (error %d)", ret);
+        snprintf(msg, sizeof(msg), "ES_GetNumTitles failed (error %d)", ret);
         ui_draw_err(msg);
         return;
     }
 
-    u64 *title_list = (u64*)memalign(32, title_count * sizeof(u64));
+    u64 *title_list = (u64 *)memalign(32, title_count * sizeof(u64));
     if (!title_list) {
-        ui_draw_err("Memory allocation failed");
+        ui_draw_err("Out of memory - can't allocate title list");
         return;
     }
 
     ret = ES_GetTitles(title_list, title_count);
     if (ret < 0) {
         char msg[64];
-        snprintf(msg, sizeof(msg), "Failed to get title list (error %d)", ret);
+        snprintf(msg, sizeof(msg), "ES_GetTitles failed (error %d)", ret);
         ui_draw_err(msg);
         free(title_list);
         return;
     }
 
-    /* Table header */
-    ui_printf(UI_BCYAN "   %-8s %-12s %-10s %s\n" UI_RESET,
-           "IOS", "Revision", "Status", "Notes");
+    ui_printf(UI_BCYAN "   %-8s %-12s %-10s %s\n" UI_RESET, "IOS", "Revision", "Status", "Notes");
     ui_printf(UI_WHITE "   -------- ------------ ---------- --------------------------\n" UI_RESET);
 
-    s_total_ios = 0;
+    s_total_ios  = 0;
     s_stub_count = 0;
     s_cios_count = 0;
 
     memset(s_report, 0, sizeof(s_report));
     rpos = snprintf(s_report, MAX_REPORT,
-        "=== IOS INSTALLATION SCAN ===\n"
-        "%-8s %-12s %-10s %s\n"
-        "-------- ------------ ---------- ----------------------------\n",
-        "IOS", "Revision", "Status", "Notes");
+                    "=== IOS INSTALLATION SCAN ===\n"
+                    "%-8s %-12s %-10s %s\n"
+                    "-------- ------------ ---------- ----------------------------\n",
+                    "IOS", "Revision", "Status", "Notes");
 
-    /* Scan IOS titles */
     for (i = 0; i < title_count; i++) {
-        u32 title_upper = (u32)(title_list[i] >> 32);
-        u32 title_lower = (u32)(title_list[i] & 0xFFFFFFFF);
+        u32 upper = (u32)(title_list[i] >> 32);
+        u32 lower = (u32)(title_list[i] & 0xFFFFFFFF);
 
-        if (title_upper != 1) continue;
-        if (title_lower < 3 || title_lower > 255) continue;
-        if (title_lower == 0x100 || title_lower == 0x101) continue;
+        // only care about IOS titles (upper = 1, lower 3-255)
+        // skip the system menu and shop channel title IDs
+        if (upper != 1) continue;
+        if (lower < 3 || lower > 255) continue;
+        if (lower == 0x100 || lower == 0x101) continue;
 
         s_total_ios++;
 
-        /* Get revision from TMD */
         u32 tmd_size = 0;
         u32 revision = 0;
         bool is_stub = false;
 
         ret = ES_GetStoredTMDSize(title_list[i], &tmd_size);
         if (ret >= 0 && tmd_size > 0) {
-            signed_blob *tmd_buf = (signed_blob*)memalign(32, tmd_size);
-            if (tmd_buf) {
-                ret = ES_GetStoredTMD(title_list[i], tmd_buf, tmd_size);
+            signed_blob *tbuf = (signed_blob *)memalign(32, tmd_size);
+            if (tbuf) {
+                ret = ES_GetStoredTMD(title_list[i], tbuf, tmd_size);
                 if (ret >= 0) {
-                    tmd *t = SIGNATURE_PAYLOAD(tmd_buf);
+                    tmd *t = SIGNATURE_PAYLOAD(tbuf);
                     revision = t->title_version;
-                    if (t->num_contents == 0 ||
-                        is_known_stub_revision(title_lower, revision))
+                    if (t->num_contents == 0 || is_known_stub_revision(revision))
                         is_stub = true;
                 }
-                free(tmd_buf);
+                free(tbuf);
             }
         }
 
-        /* Status & color */
         const char *status, *color;
-        const char *desc = get_ios_description(title_lower);
+        const char *desc = get_ios_description(lower);
 
         if (is_stub) {
             status = "STUB";
-            color = UI_BYELLOW;
+            color  = UI_BYELLOW;
             s_stub_count++;
-        } else if ((title_lower >= 222 && title_lower <= 223) ||
-                   (title_lower >= 249 && title_lower <= 251)) {
+        } else if ((lower >= 222 && lower <= 223) || (lower >= 249 && lower <= 251)) {
             status = "cIOS";
-            color = UI_BCYAN;
+            color  = UI_BCYAN;
             s_cios_count++;
-        } else if (title_lower == 254 || title_lower == 236) {
+        } else if (lower == 254 || lower == 236) {
             status = "BootMii";
-            color = UI_BGREEN;
+            color  = UI_BGREEN;
         } else {
             status = "OK";
-            color = UI_BGREEN;
+            color  = UI_BGREEN;
         }
 
         ui_printf("   %sIOS%-4u  rev %-8u %-10s" UI_WHITE " %s\n" UI_RESET,
-               color, title_lower, revision, status, desc);
+                  color, lower, revision, status, desc);
 
         rpos += snprintf(s_report + rpos, MAX_REPORT - rpos,
-            "IOS%-4u  rev %-8u %-10s %s\n",
-            title_lower, revision, status, desc);
+                         "IOS%-4u  rev %-8u %-10s %s\n",
+                         lower, revision, status, desc);
     }
 
     free(title_list);
 
-    /* Summary */
     ui_draw_section("Summary");
-
     {
         char buf[64];
+
         snprintf(buf, sizeof(buf), "%d", s_total_ios);
         ui_draw_kv("Total IOS Found", buf);
 
         snprintf(buf, sizeof(buf), "%d", s_total_ios - s_stub_count);
-        ui_draw_kv("Active IOS", buf);
+        ui_draw_kv("Active (non-stub)", buf);
 
         snprintf(buf, sizeof(buf), "%d", s_stub_count);
         if (s_stub_count > 0)
@@ -186,22 +188,22 @@ void run_ios_check(void) {
             ui_draw_kv_color("Stub IOS", UI_BGREEN, buf);
 
         if (s_cios_count > 0) {
-            snprintf(buf, sizeof(buf), "%d (cIOS detected)", s_cios_count);
-            ui_draw_kv("Custom IOS", buf);
+            snprintf(buf, sizeof(buf), "%d installed", s_cios_count);
+            ui_draw_kv("Custom IOS (cIOS)", buf);
         }
     }
 
     rpos += snprintf(s_report + rpos, MAX_REPORT - rpos,
-        "\nTotal IOS: %d | Active: %d | Stubs: %d | cIOS: %d\n\n",
-        s_total_ios, s_total_ios - s_stub_count, s_stub_count, s_cios_count);
+                     "\nTotal: %d | Active: %d | Stubs: %d | cIOS: %d\n\n",
+                     s_total_ios, s_total_ios - s_stub_count,
+                     s_stub_count, s_cios_count);
 
-    /* Recommendations */
     ui_printf("\n");
     if (s_cios_count > 0) {
-        ui_draw_ok("cIOS detected - USB loaders should work properly");
+        ui_draw_ok("cIOS detected - USB loaders should work");
     } else {
-        ui_draw_warn("No cIOS found - USB loaders require cIOS d2x");
-        ui_draw_info("Install d2x cIOS via d2x cIOS Installer");
+        ui_draw_warn("No cIOS found - USB loaders won't work without one");
+        ui_draw_info("Install d2x cIOS via d2x cIOS Installer (slots 248-251)");
     }
 
     ui_printf("\n");

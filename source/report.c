@@ -123,6 +123,8 @@ static int ask_what_to_do(const char *path, long size) {
 void run_report_generator(void) {
     // static so we don't blow the stack - 8KB on the stack is a bad idea
     static char section[8192];
+    // save_path as a fixed buffer so we never have a dangling pointer
+    static char save_path[256];
     char buf[128];
     FILE *fp = NULL;
 
@@ -130,52 +132,61 @@ void run_report_generator(void) {
     ui_draw_info("If you already ran a module, we'll use those results.");
     ui_printf("\n");
 
-    // figure out where to save before we start doing any work
-    const char *save_path = NULL;
-    const char *base_dir  = NULL;
-    char alt_path[128];
+    save_path[0] = '\0';
 
     long existing_sd  = check_existing(REPORT_PATH_SD);
     long existing_usb = check_existing(REPORT_PATH_USB);
     long existing_sz  = -1;
+    // which base dir the existing report lives on (for numbering new files)
+    const char *base_dir = NULL;
+    // path of the existing report (points into REPORT_PATH_SD/USB literals)
+    const char *existing_path = NULL;
 
     if (existing_sd >= 0) {
-        existing_sz = existing_sd;
-        save_path   = REPORT_PATH_SD;
-        base_dir    = "sd:";
+        existing_sz   = existing_sd;
+        existing_path = REPORT_PATH_SD;
+        base_dir      = "sd:";
     } else if (existing_usb >= 0) {
-        existing_sz = existing_usb;
-        save_path   = REPORT_PATH_USB;
-        base_dir    = "usb:";
+        existing_sz   = existing_usb;
+        existing_path = REPORT_PATH_USB;
+        base_dir      = "usb:";
     }
 
     if (existing_sz >= 0) {
-        int action = ask_what_to_do(save_path, existing_sz);
+        // ask_what_to_do uses raw printf so we must NOT be in scroll mode.
+        // ui_scroll_view hasn't been entered yet at this point so we're fine,
+        // but call VIDEO_WaitVSync first to make sure the last frame is flushed.
+        VIDEO_WaitVSync();
+
+        int action = ask_what_to_do(existing_path, existing_sz);
         if (action == 2) {
             ui_draw_info("Cancelled.");
             return;
         } else if (action == 1) {
-            // keep the old one, find a new name
-            next_available_filename(base_dir, alt_path, sizeof(alt_path));
-            save_path = alt_path;
+            // keep the old one, find a new numbered name
+            next_available_filename(base_dir, save_path, sizeof(save_path));
+        } else {
+            // overwrite
+            strncpy(save_path, existing_path, sizeof(save_path) - 1);
+            save_path[sizeof(save_path) - 1] = '\0';
         }
-        // action 0 = overwrite, save_path stays the same
     } else {
         // no existing report - try SD first, then USB
         fp = fopen(REPORT_PATH_SD, "w");
         if (fp) {
             fclose(fp);
-            save_path = REPORT_PATH_SD;
+            strncpy(save_path, REPORT_PATH_SD, sizeof(save_path) - 1);
         } else {
             fp = fopen(REPORT_PATH_USB, "w");
             if (fp) {
                 fclose(fp);
-                save_path = REPORT_PATH_USB;
+                strncpy(save_path, REPORT_PATH_USB, sizeof(save_path) - 1);
             }
         }
+        save_path[sizeof(save_path) - 1] = '\0';
     }
 
-    if (!save_path) {
+    if (save_path[0] == '\0') {
         ui_draw_err("No writable storage found!");
         ui_draw_warn("Insert an SD card or USB drive and try again.");
         return;

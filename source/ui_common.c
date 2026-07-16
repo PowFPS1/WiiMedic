@@ -1,360 +1,326 @@
-// ui_common.c - all the drawing helpers, scroll buffer, status indicators
-// uses ASCII only - no unicode, the Wii console font doesn't have it
+// ui_common.c
+// all the drawing stuff lives here. scroll buffer, spinner, color helpers, etc.
+// i tried to keep it simple but the scroll viewer kind of got away from me
+
+// NOTE: ASCII only. the Wii console font doesn't do unicode and i'm not
+// carrying a font renderer just to get a checkmark symbol.
 
 #include <gccore.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 #include <wiiuse/wpad.h>
+#include <ogc/lwp.h>
 
 #include "ui_common.h"
 
+// how wide a "line" is in characters. not really enforced anywhere
 #define LINE_WIDTH 60
 
-// scroll buffer - captures output from modules so the user can scroll through it
+// scroll buffer - when a module runs, its output goes here instead of
+// directly to the terminal. then the user can scroll through it after.
+// 256 lines should be enough for anyone (famous last words)
 #define SCROLL_MAX_LINES 256
 #define SCROLL_LINE_LEN  512
 #define SCROLL_VISIBLE   18
 
 static char s_scroll_lines[SCROLL_MAX_LINES][SCROLL_LINE_LEN];
-static int s_scroll_count = 0;
-static char s_scroll_cur[SCROLL_LINE_LEN];
-static int s_scroll_pos = 0;
+static int  s_scroll_count = 0;
+static char s_scroll_cur[SCROLL_LINE_LEN];  // line currently being built
+static int  s_scroll_pos = 0;
 static bool s_scroll_active = false;
 
 
+// intercept printf when the scroll buffer is active.
+// splits on newlines and packs lines into s_scroll_lines[].
+// when scroll is off it just falls through to vprintf like normal.
 int ui_printf(const char *fmt, ...) {
-  va_list args;
-  char tmp[512];
-  int len, i;
+    va_list args;
+    char tmp[512];
+    int len, i;
 
-  va_start(args, fmt);
-  if (!s_scroll_active) {
-    len = vprintf(fmt, args);
-    va_end(args);
-    return len;
-  }
-
-  len = vsnprintf(tmp, sizeof(tmp), fmt, args);
-  va_end(args);
-
-  for (i = 0; i < len && tmp[i]; i++) {
-    if (tmp[i] == '\n') {
-      s_scroll_cur[s_scroll_pos] = '\0';
-      if (s_scroll_count < SCROLL_MAX_LINES) {
-        memcpy(s_scroll_lines[s_scroll_count], s_scroll_cur, s_scroll_pos + 1);
-        s_scroll_count++;
-      }
-      s_scroll_pos = 0;
-      s_scroll_cur[0] = '\0';
-    } else {
-      if (s_scroll_pos < SCROLL_LINE_LEN - 1) {
-        s_scroll_cur[s_scroll_pos++] = tmp[i];
-      }
+    va_start(args, fmt);
+    if (!s_scroll_active) {
+        len = vprintf(fmt, args);
+        va_end(args);
+        return len;
     }
-  }
-  return len;
+
+    len = vsnprintf(tmp, sizeof(tmp), fmt, args);
+    va_end(args);
+
+    for (i = 0; i < len && tmp[i]; i++) {
+        if (tmp[i] == '\n') {
+            s_scroll_cur[s_scroll_pos] = '\0';
+            if (s_scroll_count < SCROLL_MAX_LINES) {
+                memcpy(s_scroll_lines[s_scroll_count], s_scroll_cur, s_scroll_pos + 1);
+                s_scroll_count++;
+            }
+            // silently drop lines past the limit. not ideal but itll work
+            s_scroll_pos = 0;
+            s_scroll_cur[0] = '\0';
+        } else {
+            if (s_scroll_pos < SCROLL_LINE_LEN - 1)
+                s_scroll_cur[s_scroll_pos++] = tmp[i];
+        }
+    }
+    return len;
 }
 
 
-void ui_clear(void) { printf("\x1b[2J\x1b[0;0H"); }
+void ui_clear(void) {
+    printf("\x1b[2J\x1b[0;0H");
+}
 
 
 void ui_draw_banner(void) {
-  printf("\n");
-  printf(
-      UI_BGREEN
-      "  "
-      "==========================================================\n" UI_RESET);
-  printf("\n");
-  printf(UI_BWHITE "          [+]  W i i M e d i c" UI_RESET "   " UI_CYAN
-                   "v" WIIMEDIC_VERSION "\n" UI_RESET);
-  printf("\n");
-  printf(UI_WHITE "          System Diagnostic & Health Monitor\n" UI_RESET);
-  printf("\n");
-  printf(
-      UI_BGREEN
-      "  "
-      "==========================================================\n" UI_RESET);
-  printf("\n");
+    printf("\n");
+    printf(UI_BGREEN "  ==========================================================\n" UI_RESET);
+    printf("\n");
+    printf(UI_BWHITE "          [+]  W i i M e d i c" UI_RESET "   " UI_CYAN "v" WIIMEDIC_VERSION "\n" UI_RESET);
+    printf("\n");
+    printf(UI_WHITE  "          System Diagnostic & Health Monitor\n" UI_RESET);
+    printf("\n");
+    printf(UI_BGREEN "  ==========================================================\n" UI_RESET);
+    printf("\n");
 }
 
 
-// one draw call instead of 60 separate ones
 void ui_draw_line(void) {
-  ui_printf("  " UI_WHITE
-            "------------------------------------------------------------"
-            "\n" UI_RESET);
+    // one call instead of printing 60 dashes by hand
+    ui_printf("  " UI_WHITE "------------------------------------------------------------\n" UI_RESET);
 }
 
 
 void ui_draw_section(const char *title) {
-  ui_printf("\n" UI_BCYAN "   --- %s ---\n\n" UI_RESET, title);
+    ui_printf("\n" UI_BCYAN "   --- %s ---\n\n" UI_RESET, title);
 }
 
 
 void ui_draw_kv(const char *label, const char *value) {
-  int label_len = (int)strlen(label);
-  int dots = 30 - label_len;
-  int i;
-  if (dots < 2)
-    dots = 2;
+    int dots = 30 - (int)strlen(label);
+    int i;
+    if (dots < 2) dots = 2;
 
-  ui_printf("   " UI_CYAN "%s " UI_RESET, label);
-  for (i = 0; i < dots; i++)
-    ui_printf(".");
-  ui_printf(" " UI_BWHITE "%s\n" UI_RESET, value);
+    ui_printf("   " UI_CYAN "%s " UI_RESET, label);
+    for (i = 0; i < dots; i++) ui_printf(".");
+    ui_printf(" " UI_BWHITE "%s\n" UI_RESET, value);
 }
 
 
 void ui_draw_kv_color(const char *label, const char *color, const char *value) {
-  int label_len = (int)strlen(label);
-  int dots = 30 - label_len;
-  int i;
-  if (dots < 2)
-    dots = 2;
+    int dots = 30 - (int)strlen(label);
+    int i;
+    if (dots < 2) dots = 2;
 
-  ui_printf("   " UI_CYAN "%s " UI_RESET, label);
-  for (i = 0; i < dots; i++)
-    ui_printf(".");
-  ui_printf(" %s%s\n" UI_RESET, color, value);
+    ui_printf("   " UI_CYAN "%s " UI_RESET, label);
+    for (i = 0; i < dots; i++) ui_printf(".");
+    ui_printf(" %s%s\n" UI_RESET, color, value);
 }
 
 
+// draws a little progress bar. goes red when you're above 90%, yellow above 70%.
+// looks kinda cool on the NAND usage screen
 void ui_draw_bar(u32 used, u32 total, int bar_width) {
-  int filled = 0;
-  float pct = 0.0f;
-  const char *color;
-  int i;
+    int filled = 0;
+    float pct = 0.0f;
+    const char *color;
+    int i;
 
-  if (total > 0) {
-    filled = (int)((u64)used * bar_width / total);
-    pct = (float)used * 100.0f / (float)total;
-  }
-  if (filled > bar_width)
-    filled = bar_width;
+    if (total > 0) {
+        filled = (int)((u64)used * bar_width / total);
+        pct = (float)used * 100.0f / (float)total;
+    }
+    if (filled > bar_width) filled = bar_width;
 
-  if (pct > 90.0f)
-    color = UI_BRED;
-  else if (pct > 70.0f)
-    color = UI_BYELLOW;
-  else
-    color = UI_BGREEN;
-
-  ui_printf("   [");
-  for (i = 0; i < bar_width; i++) {
-    if (i < filled)
-      ui_printf("%s#" UI_RESET, color);
+    if (pct > 90.0f)
+        color = UI_BRED;
+    else if (pct > 70.0f)
+        color = UI_BYELLOW;
     else
-      ui_printf(UI_WHITE "." UI_RESET);
-  }
-  ui_printf("] %s%.1f%%\n" UI_RESET, color, pct);
+        color = UI_BGREEN;
+
+    ui_printf("   [");
+    for (i = 0; i < bar_width; i++) {
+        if (i < filled)
+            ui_printf("%s#" UI_RESET, color);
+        else
+            ui_printf(UI_WHITE "." UI_RESET);
+    }
+    ui_printf("] %s%.1f%%\n" UI_RESET, color, pct);
 }
 
 
-void ui_draw_ok(const char *msg) {
-  ui_printf("   " UI_BGREEN "[OK]" UI_RESET " %s\n", msg);
-}
-
-void ui_draw_warn(const char *msg) {
-  ui_printf("   " UI_BYELLOW "[!!]" UI_RESET " %s\n", msg);
-}
-
-void ui_draw_err(const char *msg) {
-  ui_printf("   " UI_BRED "[XX]" UI_RESET " %s\n", msg);
-}
-
-void ui_draw_info(const char *msg) {
-  ui_printf("   " UI_BCYAN "(i)" UI_RESET "  %s\n", msg);
-}
+void ui_draw_ok(const char *msg)   { ui_printf("   " UI_BGREEN  "[OK]" UI_RESET " %s\n", msg); }
+void ui_draw_warn(const char *msg) { ui_printf("   " UI_BYELLOW "[!!]" UI_RESET " %s\n", msg); }
+void ui_draw_err(const char *msg)  { ui_printf("   " UI_BRED    "[XX]" UI_RESET " %s\n", msg); }
+void ui_draw_info(const char *msg) { ui_printf("   " UI_BCYAN   "(i)" UI_RESET  "  %s\n", msg); }
 
 
 void ui_scroll_begin(void) {
-  s_scroll_count = 0;
-  s_scroll_pos = 0;
-  s_scroll_cur[0] = '\0';
-  s_scroll_active = true;
+    s_scroll_count = 0;
+    s_scroll_pos   = 0;
+    s_scroll_cur[0] = '\0';
+    s_scroll_active = true;
 }
 
 
+// the scroll viewer. called after a module finishes running.
+// handles up/down/left/right navigation and exits on A or B.
 void ui_scroll_view(const char *title) {
-  int offset = 0;
-  int max_offset;
-  int visible = SCROLL_VISIBLE;
+    int offset = 0;
+    int max_offset;
+    int visible = SCROLL_VISIBLE;
+    int i;
 
-  /* Flush any remaining partial line */
-  if (s_scroll_pos > 0) {
-    s_scroll_cur[s_scroll_pos] = '\0';
-    if (s_scroll_count < SCROLL_MAX_LINES) {
-      memcpy(s_scroll_lines[s_scroll_count], s_scroll_cur, s_scroll_pos + 1);
-      s_scroll_count++;
+    // flush whatever line is still in the buffer
+    if (s_scroll_pos > 0) {
+        s_scroll_cur[s_scroll_pos] = '\0';
+        if (s_scroll_count < SCROLL_MAX_LINES) {
+            memcpy(s_scroll_lines[s_scroll_count], s_scroll_cur, s_scroll_pos + 1);
+            s_scroll_count++;
+        }
+        s_scroll_pos = 0;
     }
-    s_scroll_pos = 0;
-  }
-  s_scroll_active = false;
+    s_scroll_active = false;
 
-  max_offset = s_scroll_count - visible;
-  if (max_offset < 0)
-    max_offset = 0;
+    max_offset = s_scroll_count - visible;
+    if (max_offset < 0) max_offset = 0;
 
-  while (1) {
-    int i, end;
-    u32 wpad, gpad;
-    bool redraw;
-
-    printf("\x1b[2J\x1b[0;0H");
-
-    /* Compact header */
-    printf(UI_BGREEN " [+] WiiMedic" UI_RESET " " UI_CYAN
-                     "v" WIIMEDIC_VERSION UI_RESET "  " UI_BWHITE
-                     "%s\n" UI_RESET,
-           title);
-    printf(UI_WHITE " ");
-    for (i = 0; i < 58; i++)
-      printf("-");
-    printf("\n" UI_RESET);
-
-    /* Content lines */
-    end = offset + visible;
-    if (end > s_scroll_count)
-      end = s_scroll_count;
-    for (i = offset; i < end; i++) {
-      printf(UI_RESET "%s\n", s_scroll_lines[i]);
-    }
-    /* Pad so footer stays at bottom */
-    for (i = end - offset; i < visible; i++)
-      printf("\n");
-
-    /* Footer */
-    printf(UI_WHITE " ");
-    for (i = 0; i < 58; i++)
-      printf("-");
-    printf("\n" UI_RESET);
-    if (max_offset > 0) {
-      printf(UI_WHITE " [UP/DOWN] Scroll  [LEFT/RIGHT] Page  "
-                      "[A/B] Return" UI_RESET UI_CYAN "  [%d-%d/%d]\n" UI_RESET,
-             offset + 1, end, s_scroll_count);
-    } else {
-      printf(UI_WHITE " Press [A] or [B] to return to menu...\n" UI_RESET);
-    }
-
-    /* Input loop */
     while (1) {
-      WPAD_ScanPads();
-      PAD_ScanPads();
-      wpad = WPAD_ButtonsDown(0);
-      gpad = PAD_ButtonsDown(0);
-      redraw = false;
+        int end;
+        u32 wpad, gpad;
+        bool redraw;
 
-      if ((wpad & WPAD_BUTTON_UP) || (gpad & PAD_BUTTON_UP)) {
-        if (offset > 0) {
-          offset--;
-          redraw = true;
-        }
-      }
-      if ((wpad & WPAD_BUTTON_DOWN) || (gpad & PAD_BUTTON_DOWN)) {
-        if (offset < max_offset) {
-          offset++;
-          redraw = true;
-        }
-      }
-      if ((wpad & WPAD_BUTTON_LEFT) || (gpad & PAD_BUTTON_LEFT)) {
-        offset -= visible;
-        if (offset < 0)
-          offset = 0;
-        redraw = true;
-      }
-      if ((wpad & WPAD_BUTTON_RIGHT) || (gpad & PAD_BUTTON_RIGHT)) {
-        offset += visible;
-        if (offset > max_offset)
-          offset = max_offset;
-        redraw = true;
-      }
-      if ((wpad & WPAD_BUTTON_A) || (wpad & WPAD_BUTTON_B) ||
-          (gpad & PAD_BUTTON_A) || (gpad & PAD_BUTTON_B)) {
-        return;
-      }
+        printf("\x1b[2J\x1b[0;0H");
 
-      if (redraw)
-        break;
-      VIDEO_WaitVSync();
+        printf(UI_BGREEN " [+] WiiMedic" UI_RESET " " UI_CYAN "v" WIIMEDIC_VERSION UI_RESET
+               "  " UI_BWHITE "%s\n" UI_RESET, title);
+        printf(UI_WHITE " ");
+        for (i = 0; i < 58; i++) printf("-");
+        printf("\n" UI_RESET);
+
+        end = offset + visible;
+        if (end > s_scroll_count) end = s_scroll_count;
+
+        for (i = offset; i < end; i++)
+            printf(UI_RESET "%s\n", s_scroll_lines[i]);
+
+        // pad blank lines so the footer always sits at the bottom
+        for (i = end - offset; i < visible; i++)
+            printf("\n");
+
+        printf(UI_WHITE " ");
+        for (i = 0; i < 58; i++) printf("-");
+        printf("\n" UI_RESET);
+
+        if (max_offset > 0) {
+            printf(UI_WHITE " [UP/DOWN] Scroll  [LEFT/RIGHT] Page  [A/B] Return"
+                   UI_RESET UI_CYAN "  [%d-%d/%d]\n" UI_RESET,
+                   offset + 1, end, s_scroll_count);
+        } else {
+            printf(UI_WHITE " Press [A] or [B] to return to menu...\n" UI_RESET);
+        }
+
+        while (1) {
+            WPAD_ScanPads();
+            PAD_ScanPads();
+            wpad = WPAD_ButtonsDown(0);
+            gpad = PAD_ButtonsDown(0);
+            redraw = false;
+
+            if ((wpad & WPAD_BUTTON_UP) || (gpad & PAD_BUTTON_UP)) {
+                if (offset > 0) { offset--; redraw = true; }
+            }
+            if ((wpad & WPAD_BUTTON_DOWN) || (gpad & PAD_BUTTON_DOWN)) {
+                if (offset < max_offset) { offset++; redraw = true; }
+            }
+            if ((wpad & WPAD_BUTTON_LEFT) || (gpad & PAD_BUTTON_LEFT)) {
+                offset -= visible;
+                if (offset < 0) offset = 0;
+                redraw = true;
+            }
+            if ((wpad & WPAD_BUTTON_RIGHT) || (gpad & PAD_BUTTON_RIGHT)) {
+                offset += visible;
+                if (offset > max_offset) offset = max_offset;
+                redraw = true;
+            }
+            if ((wpad & WPAD_BUTTON_A) || (wpad & WPAD_BUTTON_B) ||
+                (gpad & PAD_BUTTON_A) || (gpad & PAD_BUTTON_B)) {
+                return;
+            }
+
+            if (redraw) break;
+            VIDEO_WaitVSync();
+        }
     }
-  }
 }
 
 
 void ui_draw_footer(const char *msg) {
-  printf("\n");
-  ui_draw_line();
-  if (msg)
-    printf("   " UI_WHITE "%s\n" UI_RESET, msg);
-  else
-    printf("   " UI_WHITE
-           "[UP/DOWN] Navigate   [A] Select   [HOME] Exit\n" UI_RESET);
+    printf("\n");
+    ui_draw_line();
+    if (msg)
+        printf("   " UI_WHITE "%s\n" UI_RESET, msg);
+    else
+        printf("   " UI_WHITE "[UP/DOWN] Navigate   [A] Select   [HOME] Exit\n" UI_RESET);
 }
 
 
 void ui_wait_button(void) {
-  printf("\n   " UI_WHITE "Press [A] or [B] to return to menu..." UI_RESET
-         "\n");
-
-  while (1) {
-    WPAD_ScanPads();
-    PAD_ScanPads();
-
-    u32 wpad = WPAD_ButtonsDown(0);
-    u32 gpad = PAD_ButtonsDown(0);
-
-    if ((wpad & WPAD_BUTTON_A) || (wpad & WPAD_BUTTON_B) ||
-        (gpad & PAD_BUTTON_A) || (gpad & PAD_BUTTON_B)) {
-      break;
+    printf("\n   " UI_WHITE "Press [A] or [B] to return to menu..." UI_RESET "\n");
+    while (1) {
+        WPAD_ScanPads();
+        PAD_ScanPads();
+        u32 wpad = WPAD_ButtonsDown(0);
+        u32 gpad = PAD_ButtonsDown(0);
+        if ((wpad & WPAD_BUTTON_A) || (wpad & WPAD_BUTTON_B) ||
+            (gpad & PAD_BUTTON_A) || (gpad & PAD_BUTTON_B))
+            break;
+        VIDEO_WaitVSync();
     }
-
-    VIDEO_WaitVSync();
-  }
 }
 
 
-/* -------------------------------------------------------------------------
- * Spinner - runs on a background thread so the main thread can do work
- * without the screen looking frozen.
- * ------------------------------------------------------------------------- */
-#include <ogc/lwp.h>
+// spinner that runs on a background thread so the screen doesn't just
+// freeze while a module does its thing. without this people think it crashed.
+// stack is 4KB which is more than enough
 
-static volatile bool   s_spin_active = false;
-static lwp_t           s_spin_thread;
-static u8              s_spin_stack[4096] __attribute__((aligned(32)));
-static char            s_spin_msg[64] = "Working...";
+static volatile bool  s_spin_active = false;
+static lwp_t          s_spin_thread;
+static u8             s_spin_stack[4096] __attribute__((aligned(32)));
+static char           s_spin_msg[64] = "Working...";
 
 static void *spin_thread_func(void *arg) {
-  const char *frames = "|/-\\";
-  int f = 0;
-  (void)arg;
-  while (s_spin_active) {
-    printf("\r   " UI_BYELLOW "[%c]" UI_RESET " %s   ", frames[f & 3], s_spin_msg);
-    f++;
+    const char *frames = "|/-\\";
+    int f = 0;
     int i;
-    for (i = 0; i < 6 && s_spin_active; i++)
-      VIDEO_WaitVSync();
-  }
-  /* Erase the spinner line */
-  printf("\r                                                  \r");
-  return NULL;
+    (void)arg;
+
+    while (s_spin_active) {
+        printf("\r   " UI_BYELLOW "[%c]" UI_RESET " %s   ", frames[f & 3], s_spin_msg);
+        f++;
+        for (i = 0; i < 6 && s_spin_active; i++)
+            VIDEO_WaitVSync();
+    }
+    // wipe the spinner line when done
+    printf("\r                                                  \r");
+    return NULL;
 }
 
 void ui_spin_start(const char *msg) {
-  if (msg) {
-    strncpy(s_spin_msg, msg, sizeof(s_spin_msg) - 1);
-    s_spin_msg[sizeof(s_spin_msg) - 1] = '\0';
-  } else {
-    strncpy(s_spin_msg, "Working...", sizeof(s_spin_msg));
-  }
-  s_spin_active = true;
-  LWP_CreateThread(&s_spin_thread, spin_thread_func, NULL,
-                   s_spin_stack, sizeof(s_spin_stack), 80);
+    if (msg) {
+        strncpy(s_spin_msg, msg, sizeof(s_spin_msg) - 1);
+        s_spin_msg[sizeof(s_spin_msg) - 1] = '\0';
+    } else {
+        strncpy(s_spin_msg, "Working...", sizeof(s_spin_msg));
+    }
+    s_spin_active = true;
+    LWP_CreateThread(&s_spin_thread, spin_thread_func, NULL,
+                     s_spin_stack, sizeof(s_spin_stack), 80);
 }
 
 void ui_spin_stop(void) {
-  s_spin_active = false;
-  LWP_JoinThread(s_spin_thread, NULL);
+    s_spin_active = false;
+    LWP_JoinThread(s_spin_thread, NULL);
 }

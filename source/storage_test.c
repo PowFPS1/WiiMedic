@@ -1,257 +1,247 @@
-// storage_test.c - benchmarks SD card and USB drive read/write speeds
+// storage_test.c
+// benchmarks SD card and USB drive read/write speeds and pokes around
+// at the root directory a bit to see what's there.
+//
+// the benchmark writes a 1MB temp file and reads it back, repeated 3 times
+// and averaged. it's not super scientific but it gives a reasonable ballpark
+// for whether your card is fast enough for USB Loader GX and friends.
 
+#include <dirent.h>
+#include <fat.h>
+#include <gccore.h>
+#include <malloc.h>
+#include <ogc/lwp_watchdog.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <malloc.h>
-#include <time.h>
-#include <gccore.h>
-#include <fat.h>
-#include <dirent.h>
 #include <sys/stat.h>
-#include <ogc/lwp_watchdog.h>
+#include <time.h>
 
 #include "storage_test.h"
 #include "ui_common.h"
 
-#define TEST_FILE_SIZE   (1024 * 1024)  // 1MB test file
-#define TEST_BLOCK_SIZE  (32 * 1024)    // 32KB chunks
-#define TEST_ITERATIONS  3              // average over 3 runs
-#define SPEED_GOOD_KB    2000           // above this = good
-#define SPEED_OK_KB      1000           // above this = acceptable
+#define TEST_SIZE       (1024 * 1024)  // 1MB - big enough to get a real measurement
+#define BLOCK_SIZE      (32 * 1024)    // 32KB blocks, matches typical SD cluster size
+#define ITERATIONS      3              // average over 3 runs to smooth out caching
+#define SPEED_GOOD_KB   2000           // >= 2000 KB/s = thumbs up
+#define SPEED_OK_KB     1000           // >= 1000 KB/s = acceptable but not great
 
 static char s_report[4096];
 
 
-static bool check_device_present(const char *path) {
-    DIR *dir = opendir(path);
-    if (dir) { closedir(dir); return true; }
+static bool device_is_accessible(const char *path) {
+    DIR *d = opendir(path);
+    if (d) { closedir(d); return true; }
     return false;
 }
 
 
-static void get_device_info(const char *device_name, const char *path) {
-    DIR *dir = opendir(path);
-    struct dirent *entry;
-    int file_count = 0, dir_count = 0;
-    char buf[64];
-
-    if (!dir) {
+// looks at the root directory and counts files/folders.
+// also checks for /apps since that's the thing everyone actually cares about.
+static void show_device_info(const char *name, const char *path) {
+    DIR *d = opendir(path);
+    if (!d) {
         char msg[128];
-        snprintf(msg, sizeof(msg), "%s not detected or not accessible", device_name);
+        snprintf(msg, sizeof(msg), "%s: not accessible", name);
         ui_draw_err(msg);
         return;
     }
 
-    while ((entry = readdir(dir)) != NULL) {
+    struct dirent *e;
+    int files = 0, dirs = 0;
+    char buf[64];
+
+    while ((e = readdir(d)) != NULL) {
         struct stat st;
-        char fullpath[512];
-        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
-            continue;
-        snprintf(fullpath, sizeof(fullpath), "%s/%s", path, entry->d_name);
-        if (stat(fullpath, &st) == 0) {
-            if (S_ISDIR(st.st_mode)) dir_count++;
-            else file_count++;
+        char full[512];
+        if (strcmp(e->d_name, ".") == 0 || strcmp(e->d_name, "..") == 0) continue;
+        snprintf(full, sizeof(full), "%s/%s", path, e->d_name);
+        if (stat(full, &st) == 0) {
+            if (S_ISDIR(st.st_mode)) dirs++;
+            else files++;
         }
     }
-    closedir(dir);
+    closedir(d);
 
     {
         char msg[128];
-        snprintf(msg, sizeof(msg), "%s detected", device_name);
+        snprintf(msg, sizeof(msg), "%s detected", name);
         ui_draw_ok(msg);
     }
 
-    snprintf(buf, sizeof(buf), "%d files, %d folders", file_count, dir_count);
+    snprintf(buf, sizeof(buf), "%d files, %d folders", files, dirs);
     ui_draw_kv("Root Contents", buf);
 
-    /* Check for /apps */
+    // check for the apps folder - homebrew users care about this
     {
         char appspath[256];
-        struct dirent *apps_entry;
         snprintf(appspath, sizeof(appspath), "%s/apps", path);
-        DIR *apps = opendir(appspath);
-        if (apps) {
+        DIR *ad = opendir(appspath);
+        if (ad) {
             int app_count = 0;
-            while ((apps_entry = readdir(apps)) != NULL) {
-                if (apps_entry->d_name[0] != '.') app_count++;
+            struct dirent *ae;
+            while ((ae = readdir(ad)) != NULL) {
+                if (ae->d_name[0] != '.') app_count++;
             }
-            closedir(apps);
-            snprintf(buf, sizeof(buf), "%d homebrew apps found", app_count);
-            ui_draw_kv("Apps Directory", buf);
+            closedir(ad);
+            snprintf(buf, sizeof(buf), "%d apps", app_count);
+            ui_draw_kv("/apps", buf);
         }
     }
 }
 
 
-static void run_benchmark(const char *device_name, const char *base_path) {
-    char testpath[256];
-    int blocks = TEST_FILE_SIZE / TEST_BLOCK_SIZE;
+static void run_benchmark(const char *name, const char *base) {
+    char testfile[256];
+    int blocks = TEST_SIZE / BLOCK_SIZE;
     int i, iter;
-    u64 write_total_ticks = 0, read_total_ticks = 0;
-    float write_speed_kbs, read_speed_kbs;
-    const char *write_color, *read_color, *rating;
+    u64 write_ticks = 0, read_ticks = 0;
+    float write_kbs, read_kbs;
     char buf[128];
 
-    snprintf(testpath, sizeof(testpath), "%s/wiimedic_benchmark.tmp", base_path);
+    snprintf(testfile, sizeof(testfile), "%s/wiimedic_bench.tmp", base);
 
-    u8 *buffer = (u8*)memalign(32, TEST_BLOCK_SIZE);
-    if (!buffer) {
-        ui_draw_err("Memory allocation failed for benchmark");
+    u8 *data = (u8 *)memalign(32, BLOCK_SIZE);
+    if (!data) {
+        ui_draw_err("Can't allocate benchmark buffer - out of memory?");
         return;
     }
 
-    for (i = 0; i < TEST_BLOCK_SIZE; i++)
-        buffer[i] = (u8)(i & 0xFF);
+    // fill with a known pattern so we can theoretically verify reads too
+    // (we don't actually verify here but at least the data isn't garbage)
+    for (i = 0; i < BLOCK_SIZE; i++)
+        data[i] = (u8)(i & 0xFF);
 
-    /* Write speed */
-    ui_printf("   " UI_WHITE "Running write speed test...\n" UI_RESET);
+    // --- write test ---
+    ui_printf("   " UI_WHITE "Write test...\n" UI_RESET);
 
-    for (iter = 0; iter < TEST_ITERATIONS; iter++) {
-        FILE *fp = fopen(testpath, "wb");
-        u64 start, end;
+    for (iter = 0; iter < ITERATIONS; iter++) {
+        FILE *fp = fopen(testfile, "wb");
         if (!fp) {
-            snprintf(buf, sizeof(buf), "Cannot create test file on %s", device_name);
-            ui_draw_err(buf);
-            free(buffer);
+            char msg[128];
+            snprintf(msg, sizeof(msg), "Can't create temp file on %s - is it write protected?", name);
+            ui_draw_err(msg);
+            free(data);
             return;
         }
-        start = gettime();
+
+        u64 t0 = gettime();
         for (i = 0; i < blocks; i++) {
-            size_t written = fwrite(buffer, 1, TEST_BLOCK_SIZE, fp);
-            if ((int)written != TEST_BLOCK_SIZE) {
-                ui_draw_err("Write error during benchmark - storage may be full or faulty");
+            if ((int)fwrite(data, 1, BLOCK_SIZE, fp) != BLOCK_SIZE) {
+                ui_draw_err("Write error - card may be full or failing");
                 fclose(fp);
-                free(buffer);
-                remove(testpath);
+                free(data);
+                remove(testfile);
                 return;
             }
         }
         fflush(fp);
         fclose(fp);
-        end = gettime();
-        write_total_ticks += (end - start);
+        write_ticks += (gettime() - t0);
     }
 
     {
-        float write_time_ms = (float)ticks_to_millisecs(write_total_ticks / TEST_ITERATIONS);
-        write_speed_kbs = (write_time_ms > 0)
-            ? (float)(TEST_FILE_SIZE / 1024) * 1000.0f / write_time_ms
-            : 0.0f;
+        float ms = (float)ticks_to_millisecs(write_ticks / ITERATIONS);
+        write_kbs = (ms > 0) ? (float)(TEST_SIZE / 1024) * 1000.0f / ms : 0.0f;
     }
 
-    /* Read speed */
-    ui_printf("   " UI_WHITE "Running read speed test...\n" UI_RESET);
+    // --- read test ---
+    ui_printf("   " UI_WHITE "Read test...\n" UI_RESET);
 
-    for (iter = 0; iter < TEST_ITERATIONS; iter++) {
-        FILE *fp = fopen(testpath, "rb");
-        u64 start, end;
-        if (!fp) { ui_draw_err("Cannot open test file for reading"); break; }
-        start = gettime();
+    for (iter = 0; iter < ITERATIONS; iter++) {
+        FILE *fp = fopen(testfile, "rb");
+        if (!fp) { ui_draw_err("Can't open temp file for reading"); break; }
+
+        u64 t0 = gettime();
         for (i = 0; i < blocks; i++) {
-            size_t got = fread(buffer, 1, TEST_BLOCK_SIZE, fp);
-            if ((int)got != TEST_BLOCK_SIZE) {
-                ui_draw_err("Read error during benchmark");
+            if ((int)fread(data, 1, BLOCK_SIZE, fp) != BLOCK_SIZE) {
+                ui_draw_err("Read error - storage may be failing");
                 fclose(fp);
-                free(buffer);
-                remove(testpath);
+                free(data);
+                remove(testfile);
                 return;
             }
         }
         fclose(fp);
-        end = gettime();
-        read_total_ticks += (end - start);
+        read_ticks += (gettime() - t0);
     }
 
     {
-        float read_time_ms = (float)ticks_to_millisecs(read_total_ticks / TEST_ITERATIONS);
-        read_speed_kbs = (read_time_ms > 0)
-            ? (float)(TEST_FILE_SIZE / 1024) * 1000.0f / read_time_ms
-            : 0.0f;
+        float ms = (float)ticks_to_millisecs(read_ticks / ITERATIONS);
+        read_kbs = (ms > 0) ? (float)(TEST_SIZE / 1024) * 1000.0f / ms : 0.0f;
     }
 
-    remove(testpath);
-    free(buffer);
+    remove(testfile);
+    free(data);
 
-    /* Results */
-    write_color = (write_speed_kbs > SPEED_GOOD_KB) ? UI_BGREEN :
-                  (write_speed_kbs > SPEED_OK_KB) ? UI_BYELLOW : UI_BRED;
-    read_color  = (read_speed_kbs > SPEED_GOOD_KB) ? UI_BGREEN :
-                  (read_speed_kbs > SPEED_OK_KB) ? UI_BYELLOW : UI_BRED;
+    // --- results ---
+    const char *wcolor = (write_kbs > SPEED_GOOD_KB) ? UI_BGREEN :
+                         (write_kbs > SPEED_OK_KB)   ? UI_BYELLOW : UI_BRED;
+    const char *rcolor = (read_kbs  > SPEED_GOOD_KB) ? UI_BGREEN :
+                         (read_kbs  > SPEED_OK_KB)   ? UI_BYELLOW : UI_BRED;
 
     ui_printf("\n");
-    snprintf(buf, sizeof(buf), "%.1f KB/s (%.2f MB/s)",
-             write_speed_kbs, write_speed_kbs / 1024.0f);
-    ui_draw_kv_color("Write Speed", write_color, buf);
+    snprintf(buf, sizeof(buf), "%.1f KB/s (%.2f MB/s)", write_kbs, write_kbs / 1024.0f);
+    ui_draw_kv_color("Write Speed", wcolor, buf);
 
-    snprintf(buf, sizeof(buf), "%.1f KB/s (%.2f MB/s)",
-             read_speed_kbs, read_speed_kbs / 1024.0f);
-    ui_draw_kv_color("Read Speed", read_color, buf);
+    snprintf(buf, sizeof(buf), "%.1f KB/s (%.2f MB/s)", read_kbs, read_kbs / 1024.0f);
+    ui_draw_kv_color("Read Speed", rcolor, buf);
 
-    /* Rating */
-    if (write_speed_kbs > SPEED_GOOD_KB && read_speed_kbs > SPEED_GOOD_KB) {
-        rating = "Excellent";
-        snprintf(buf, sizeof(buf), "Speed Rating: %s", rating);
-        ui_draw_ok(buf);
-    } else if (write_speed_kbs > SPEED_OK_KB && read_speed_kbs > SPEED_OK_KB) {
-        rating = "Acceptable";
-        snprintf(buf, sizeof(buf), "Speed Rating: %s", rating);
-        ui_draw_warn(buf);
+    if (write_kbs > SPEED_GOOD_KB && read_kbs > SPEED_GOOD_KB) {
+        ui_draw_ok("Speed Rating: Excellent - you're good");
+    } else if (write_kbs > SPEED_OK_KB && read_kbs > SPEED_OK_KB) {
+        ui_draw_warn("Speed Rating: OK - might see occasional load hitches");
     } else {
-        rating = "Slow - may cause issues with game loading";
-        snprintf(buf, sizeof(buf), "Speed Rating: %s", rating);
-        ui_draw_err(buf);
+        ui_draw_err("Speed Rating: Slow - game loading may be affected");
+        ui_draw_info("Consider a faster SD card or USB drive");
     }
 }
 
 
 void run_storage_test(void) {
     int rpos = 0;
-    bool sd_present, usb_present;
+    bool sd_ok, usb_ok;
 
     memset(s_report, 0, sizeof(s_report));
     rpos = snprintf(s_report, sizeof(s_report), "=== STORAGE SPEED TEST ===\n");
 
-    sd_present  = check_device_present("sd:/");
-    usb_present = check_device_present("usb:/");
+    sd_ok  = device_is_accessible("sd:/");
+    usb_ok = device_is_accessible("usb:/");
 
-    /* SD Card */
     ui_draw_section("SD Card");
 
-    if (sd_present) {
-        get_device_info("SD Card", "sd:/");
+    if (sd_ok) {
+        show_device_info("SD Card", "sd:/");
         run_benchmark("SD Card", "sd:");
         rpos += snprintf(s_report + rpos, sizeof(s_report) - rpos,
-            "SD Card: Detected, benchmark completed\n");
+                         "SD Card: Present, benchmark completed\n");
     } else {
-        ui_draw_warn("SD Card not detected");
-        ui_draw_info("Insert an SD card and restart to test");
+        ui_draw_warn("SD Card not found");
+        ui_draw_info("Insert an SD card and re-run");
         rpos += snprintf(s_report + rpos, sizeof(s_report) - rpos,
-            "SD Card: Not detected\n");
+                         "SD Card: Not present\n");
     }
 
-    /* USB */
     ui_draw_section("USB Storage");
 
-    if (usb_present) {
-        get_device_info("USB Storage", "usb:/");
-        run_benchmark("USB Storage", "usb:");
+    if (usb_ok) {
+        show_device_info("USB Drive", "usb:/");
+        run_benchmark("USB Drive", "usb:");
         rpos += snprintf(s_report + rpos, sizeof(s_report) - rpos,
-            "USB Storage: Detected, benchmark completed\n");
+                         "USB: Present, benchmark completed\n");
     } else {
-        ui_printf("   " UI_WHITE "USB not detected (normal if none is connected)\n" UI_RESET);
-        ui_draw_info("USB must be in the port closest to the edge");
+        ui_printf("   " UI_WHITE "No USB drive detected (that's fine if you don't have one)\n" UI_RESET);
+        ui_draw_info("USB must go in the port closest to the edge of the Wii");
         rpos += snprintf(s_report + rpos, sizeof(s_report) - rpos,
-            "USB Storage: Not detected\n");
+                         "USB: Not present\n");
     }
 
-    /* Tips */
     ui_draw_section("Tips");
-    ui_draw_info("Use the bottom USB port (closest to edge) for best results");
-    ui_draw_info("USB 2.0 drives recommended; USB 3.0 works at 2.0 speeds");
-    ui_draw_info("SDHC cards (Class 10 / UHS-I) give best SD performance");
-    ui_draw_info("Format USB as FAT32 (32KB clusters) or WBFS for games");
-    ui_draw_info("SD cards over 32GB must be formatted as FAT32 (not exFAT)");
+    ui_draw_info("Use the bottom USB port (closest to console edge)");
+    ui_draw_info("USB 3.0 drives work but only run at 2.0 speeds");
+    ui_draw_info("Class 10 / UHS-I SD cards are noticeably faster");
+    ui_draw_info("Format USB as FAT32 with 32KB clusters for best results");
+    ui_draw_info("SD cards over 32GB need to be formatted as FAT32, not exFAT");
 
     rpos += snprintf(s_report + rpos, sizeof(s_report) - rpos, "\n");
 

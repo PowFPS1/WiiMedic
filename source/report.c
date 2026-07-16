@@ -192,6 +192,17 @@ void run_report_generator(void) {
         return;
     }
 
+    // clear the dialog off screen and show something immediately so the
+    // user knows we're working - on real hardware the first module takes
+    // a second or two to init and it looks totally frozen without this
+    printf("\x1b[2J\x1b[0;0H");
+    printf(UI_BGREEN " [+] WiiMedic" UI_RESET " " UI_CYAN "v" WIIMEDIC_VERSION UI_RESET "\n");
+    printf(UI_WHITE " -----------------------------------------------------------\n" UI_RESET);
+    printf("\n" UI_BYELLOW "   Preparing report, please wait...\n" UI_RESET);
+    printf("\n" UI_WHITE "   This may take a minute on real hardware.\n" UI_RESET);
+    VIDEO_WaitVSync();
+    VIDEO_WaitVSync();
+
     fp = fopen(save_path, "w");
     if (!fp) {
         ui_draw_err("Failed to open file for writing!");

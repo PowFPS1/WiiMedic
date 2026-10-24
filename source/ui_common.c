@@ -49,14 +49,27 @@ int ui_printf(const char *fmt, ...) {
     len = vsnprintf(tmp, sizeof(tmp), fmt, args);
     va_end(args);
 
+    // vsnprintf returns the number of bytes that *would* have been written,
+    // which can exceed sizeof(tmp) if the string was truncated. cap it so
+    // the loop doesn't run past the actual buffer contents.
+    if (len < 0) return 0;
+    if (len >= (int)sizeof(tmp)) len = (int)sizeof(tmp) - 1;
+
     for (i = 0; i < len && tmp[i]; i++) {
         if (tmp[i] == '\n') {
             s_scroll_cur[s_scroll_pos] = '\0';
             if (s_scroll_count < SCROLL_MAX_LINES) {
                 memcpy(s_scroll_lines[s_scroll_count], s_scroll_cur, s_scroll_pos + 1);
                 s_scroll_count++;
+            } else if (s_scroll_count == SCROLL_MAX_LINES) {
+                // buffer full - write one sentinel line so the user knows
+                // output was cut off, then stop accepting new lines
+                strncpy(s_scroll_lines[SCROLL_MAX_LINES - 1],
+                        "   [!! output truncated - scroll buffer full !!]",
+                        SCROLL_LINE_LEN - 1);
+                s_scroll_lines[SCROLL_MAX_LINES - 1][SCROLL_LINE_LEN - 1] = '\0';
+                s_scroll_count++;  // push past the limit so we only do this once
             }
-            // silently drop lines past the limit. not ideal but itll work
             s_scroll_pos = 0;
             s_scroll_cur[0] = '\0';
         } else {

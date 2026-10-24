@@ -221,17 +221,25 @@ static int parse_and_display_aps(int *rpos_ptr, u8 *buf, s32 scan_ret) {
         }
     }
 
-    // format B fallback: no leading count, stride from bss->length
+    // format B fallback: no leading count, stride from bss_entry_len().
+    // IMPORTANT: bss_entry_len() doubles bss->length because the field is in
+    // 2-byte units. do NOT use bss->length directly as a byte stride here —
+    // that was the original bug that caused mis-aligned reads in this path.
     if (count == 0) {
         ptr = buf;
         while (ptr < (end - sizeof(BSSDescriptor)) && count < MAX_SCAN_APS) {
             BSSDescriptor *bss = (BSSDescriptor *)ptr;
-            if (bss->length == 0 || bss->length < sizeof(BSSDescriptor) || bss->SSIDLength > 32)
+            if (bss->length == 0 || bss->SSIDLength > 32)
                 break;
+
+            u16 entry_len = bss_entry_len(bss);
+            if (entry_len < sizeof(BSSDescriptor))
+                entry_len = sizeof(BSSDescriptor);
+            if (ptr + entry_len > end) break;
 
             if (!bss->BSSID[0] && !bss->BSSID[1] && !bss->BSSID[2] &&
                 !bss->BSSID[3] && !bss->BSSID[4] && !bss->BSSID[5]) {
-                ptr += bss->length;
+                ptr += entry_len;
                 continue;
             }
 
@@ -254,7 +262,7 @@ static int parse_and_display_aps(int *rpos_ptr, u8 *buf, s32 scan_ret) {
                              "  %s  BSSID:%s  Ch:%d  Signal:%s  %s\n",
                              ssid, bssid_str, bss->channel, signal_str(sig), security_str(bss));
             count++;
-            ptr += bss->length;
+            ptr += entry_len;
         }
     }
 
@@ -319,11 +327,16 @@ static bool run_connectivity(void) {
 
 
 // spawns the net_init thread and waits for it to finish.
-// returns whatever net_init returned.
+// returns whatever net_init returned, or a large negative on thread failure.
 static s32 do_net_init(void) {
     s_net_done = false;
-    LWP_CreateThread(&s_net_thread, net_init_thread, NULL,
-                     s_net_stack, sizeof(s_net_stack), 64);
+    s32 tc = LWP_CreateThread(&s_net_thread, net_init_thread, NULL,
+                               s_net_stack, sizeof(s_net_stack), 64);
+    if (tc < 0) {
+        // couldn't create thread - bail out instead of spinning forever
+        ui_draw_err("Failed to create net_init thread");
+        return tc;
+    }
     while (!s_net_done) VIDEO_WaitVSync();
     return s_net_ret;
 }

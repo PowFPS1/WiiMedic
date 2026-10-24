@@ -10,7 +10,7 @@
 #include <gccore.h>
 
 /* App version */
-#define WIIMEDIC_VERSION "1.3.1"
+#define WIIMEDIC_VERSION "1.3.2"
 
 /* ANSI Color Codes - supported by libogc console */
 #define UI_RESET "\x1b[0m"

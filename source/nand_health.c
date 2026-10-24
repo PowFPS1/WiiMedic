@@ -27,6 +27,7 @@ static char s_health_status[64] = "Unknown";
 static int  s_title_count   = 0;
 static int  s_ticket_count  = 0;
 static bool s_nand_run      = false;
+static bool s_usage_valid   = false;  // false if ISFS_GetUsage failed
 
 
 bool has_nand_health_run(void) { return s_nand_run; }
@@ -69,14 +70,17 @@ void run_nand_health(void) {
     // ISFS_GetUsage returns FREE counts, not used.
     // subtract from totals to get the actual used numbers.
     u32 free_clusters = 0, free_inodes = 0;
+    s_usage_valid = false;
     ret = ISFS_GetUsage("/", &free_clusters, &free_inodes);
     if (ret >= 0) {
         s_free_blocks = (free_clusters <= NAND_TOTAL_CLUSTERS) ? free_clusters : 0;
         s_free_inodes = (free_inodes   <= NAND_TOTAL_INODES)   ? free_inodes   : 0;
         s_used_blocks = NAND_TOTAL_CLUSTERS - s_free_blocks;
         s_used_inodes = NAND_TOTAL_INODES   - s_free_inodes;
+        s_usage_valid = true;
     } else {
-        // GetUsage failing isn't fatal, we can still do the dir scan
+        // GetUsage failing isn't fatal, we can still do the dir scan,
+        // but we must NOT compute a health score from zero data.
         char errmsg[80];
         snprintf(errmsg, sizeof(errmsg), "ISFS_GetUsage failed (%d) - space data unavailable", ret);
         ui_draw_warn(errmsg);
@@ -166,26 +170,38 @@ void run_nand_health(void) {
 
         // health score calculation. completely arbitrary thresholds but
         // they seem reasonable. dock points for high usage and leftover junk.
-        s_health_score = 100;
-        cluster_pct = (float)s_used_blocks * 100.0f / (float)NAND_TOTAL_CLUSTERS;
-        inode_pct   = (float)s_used_inodes * 100.0f / (float)NAND_TOTAL_INODES;
+        // skip the score entirely if ISFS_GetUsage failed - zeroed-out usage
+        // data would produce a bogus perfect 100/100 score.
+        if (s_usage_valid) {
+            s_health_score = 100;
+            cluster_pct = (float)s_used_blocks * 100.0f / (float)NAND_TOTAL_CLUSTERS;
+            inode_pct   = (float)s_used_inodes * 100.0f / (float)NAND_TOTAL_INODES;
 
-        if      (cluster_pct > 95.0f) s_health_score -= 30;
-        else if (cluster_pct > 85.0f) s_health_score -= 15;
-        else if (cluster_pct > 75.0f) s_health_score -= 5;
+            if      (cluster_pct > 95.0f) s_health_score -= 30;
+            else if (cluster_pct > 85.0f) s_health_score -= 15;
+            else if (cluster_pct > 75.0f) s_health_score -= 5;
 
-        if      (inode_pct > 95.0f)   s_health_score -= 30;
-        else if (inode_pct > 85.0f)   s_health_score -= 15;
-        else if (inode_pct > 75.0f)   s_health_score -= 5;
+            if      (inode_pct > 95.0f)   s_health_score -= 30;
+            else if (inode_pct > 85.0f)   s_health_score -= 15;
+            else if (inode_pct > 75.0f)   s_health_score -= 5;
 
-        if (import_cnt > 0) s_health_score -= 10;
-        if (tmp_cnt > 10)   s_health_score -= 5;
-        if (s_health_score < 0) s_health_score = 0;
+            if (import_cnt > 0) s_health_score -= 10;
+            if (tmp_cnt > 10)   s_health_score -= 5;
+            if (s_health_score < 0) s_health_score = 0;
+        } else {
+            // mark score as unavailable so the report doesn't mislead
+            s_health_score = -1;
+            strcpy(s_health_status, "N/A - space data unavailable");
+        }
     }
 
     {
         char msg[128];
-        if (s_health_score >= 80) {
+        if (s_health_score < 0) {
+            // ISFS_GetUsage failed - can't give a meaningful score
+            ui_printf("\n");
+            ui_draw_warn("NAND Health Score: N/A (space data unavailable)");
+        } else if (s_health_score >= 80) {
             strcpy(s_health_status, "GOOD");
             snprintf(msg, sizeof(msg), "NAND Health Score: %d/100 - %s", s_health_score, s_health_status);
             ui_printf("\n");
@@ -203,9 +219,9 @@ void run_nand_health(void) {
         }
     }
 
-    if (cluster_pct > 85.0f)
+    if (s_usage_valid && cluster_pct > 85.0f)
         ui_draw_info("Lots of NAND used - consider deleting unused channels");
-    if (inode_pct > 85.0f)
+    if (s_usage_valid && inode_pct > 85.0f)
         ui_draw_info("Running low on inodes - lots of small files on NAND");
 
     ui_printf("\n");
@@ -217,19 +233,34 @@ void run_nand_health(void) {
 
 
 void get_nand_health_report(char *buf, int bufsize) {
-    snprintf(buf, bufsize,
-             "=== NAND HEALTH CHECK ===\n"
-             "Clusters Used:       %u / %u\n"
-             "Clusters Free:       %u\n"
-             "Inodes Used:         %u / %u\n"
-             "Inodes Free:         %u\n"
-             "Title Categories:    %d\n"
-             "Ticket Groups:       %d\n"
-             "Health Score:        %d/100\n"
-             "Status:              %s\n"
-             "\n",
-             s_used_blocks, (u32)NAND_TOTAL_CLUSTERS, s_free_blocks,
-             s_used_inodes, (u32)NAND_TOTAL_INODES,   s_free_inodes,
-             s_title_count, s_ticket_count,
-             s_health_score, s_health_status);
+    if (s_health_score < 0) {
+        snprintf(buf, bufsize,
+                 "=== NAND HEALTH CHECK ===\n"
+                 "Clusters Used:       N/A (ISFS_GetUsage failed)\n"
+                 "Clusters Free:       N/A\n"
+                 "Inodes Used:         N/A\n"
+                 "Inodes Free:         N/A\n"
+                 "Title Categories:    %d\n"
+                 "Ticket Groups:       %d\n"
+                 "Health Score:        N/A\n"
+                 "Status:              Space data unavailable\n"
+                 "\n",
+                 s_title_count, s_ticket_count);
+    } else {
+        snprintf(buf, bufsize,
+                 "=== NAND HEALTH CHECK ===\n"
+                 "Clusters Used:       %u / %u\n"
+                 "Clusters Free:       %u\n"
+                 "Inodes Used:         %u / %u\n"
+                 "Inodes Free:         %u\n"
+                 "Title Categories:    %d\n"
+                 "Ticket Groups:       %d\n"
+                 "Health Score:        %d/100\n"
+                 "Status:              %s\n"
+                 "\n",
+                 s_used_blocks, (u32)NAND_TOTAL_CLUSTERS, s_free_blocks,
+                 s_used_inodes, (u32)NAND_TOTAL_INODES,   s_free_inodes,
+                 s_title_count, s_ticket_count,
+                 s_health_score, s_health_status);
+    }
 }

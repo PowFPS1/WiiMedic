@@ -22,8 +22,21 @@ Unfortunately I set the GitHub repo to private for a moment and lost all my star
 ---
 
 <img width="1919" height="1053" alt="image" src="https://github.com/user-attachments/assets/20356601-f0fa-4961-94dd-ac9b3471e12c" />
-
 *Main menu running on Dolphin Emulator*
+
+---
+
+## What's new in v1.3.2
+
+Four bugs fixed, all in areas that are hard to test without specific hardware or IOS versions.
+
+**AP scan was reading access points at the wrong offsets.** The scan buffer parser had two code paths for different IOS buffer formats. One of them was using `bss->length` as a byte stride, but that field is in 2 byte units so it was going through the buffer at half speed, reading every AP descriptor from the wrong position and producing mixed SSIDs and BSSIDs. Fixed to use the same length calculation both paths now share.
+
+**WiFi thread failure caused an infinite hang.** If the thread that runs `net_init` failed to start, the main thread would spin waiting for a done flag that would never get set. Now checks the return value and bails out with an error message instead.
+
+**NAND health score was wrong when space data was unavailable.** If `ISFS_GetUsage` failed, usage counts were zeroed out and the health score was calculated against those zeros — giving you a perfect 100/100 GOOD result on a NAND we actually had no data for. Now skips the score entirely and shows N/A in both the UI and the saved report.
+
+**Scroll buffer truncation was silent.** When output exceeded 256 lines it just stopped recording with no indication anything was cut off. Now replaces the last line with a visible warning so you know you're not seeing everything.
 
 ---
 
@@ -115,7 +128,7 @@ make
 to build a release zip:
 ```bash
 make dist
-# outputs WiiMedic_v1.3.1.zip, ready to attach to a GitHub Release
+# outputs WiiMedic_v1.3.2.zip, ready to attach to a GitHub Release
 ```
 
 ---
@@ -142,6 +155,12 @@ built with [devkitPro](https://devkitpro.org/) and [libogc](https://github.com/d
 ## Changelog
 
 <details close>
+
+### v1.3.2
+- **AP scan stride fixed** — The format B buffer parser was using `bss->length` directly as a byte stride, but the field is in 2-byte units. Caused garbled SSIDs and BSSIDs on affected IOS versions. Now uses the same `bss_entry_len()` calculation as format A.
+- **WiFi thread hang fixed** — If `LWP_CreateThread` failed when starting the `net_init` thread, the main thread would spin forever waiting for a done flag that would never be set. Now checks the return value and returns an error instead.
+- **NAND health score fixed** — `ISFS_GetUsage` failure was producing a bogus 100/100 GOOD score because usage counts were zeroed and the health calculation ran against them anyway. Score now shows N/A in both the UI and saved report when space data is unavailable.
+- **Scroll buffer truncation warning** — Output past 256 lines was silently dropped. Now overwrites the last line with a visible truncation warning so it's obvious something got cut off.
 
 ### v1.3.1
 - **Loading spinner everywhere now** — Every diagnostic screen shows a live spinning animation while it's working now, not just the report generator. Same idea as before, just wasn't applied everywhere it should've been.

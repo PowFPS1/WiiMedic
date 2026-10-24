@@ -11,7 +11,7 @@
 </div>
 
 # WiiMedic
-### Wii System Diagnostic & Health Monitor — v1.3.1
+### Wii System Diagnostic & Health Monitor — v1.3.2
 
 ---
 

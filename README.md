@@ -8,6 +8,7 @@
 ![Platform](https://img.shields.io/badge/platform-Wii%20%7C%20vWii-8a2be2)
 ![Homebrew Browser downloads](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FPowFPS1%2FWiiMedic%2Fbadges%2Fhomebrew-browser.json)
 ![GitHub downloads](https://img.shields.io/github/downloads/PowFPS1/WiiMedic/total?label=GitHub%20downloads)
+[![Tip on PayPal](https://img.shields.io/badge/tip-PayPal-00457C?logo=paypal)](https://paypal.me/PowFPS)
 
 </div>
 
@@ -18,7 +19,7 @@
 
 I built this because I got tired of not knowing what was going on with my Wii. You get some weird behavior, you go to a forum, and everyone asks the same questions, what firmware are you on, do you have BootMii, what does your NAND look like, and you just don't know because nothing told you. I wanted something that would just lay it all out at once so you could either fix it yourself or at least walk into a conversation with actual useful information instead of just "my Wii is broken." 
 
-If you find the project useful, a star on the repo would mean a lot!
+If you find the project useful, a star on the repo would mean a lot! And if it saved you some headache and you want to chip in, you can [tip me on PayPal](https://paypal.me/PowFPS). WiiMedic is staying free either way.
 
 ---
 

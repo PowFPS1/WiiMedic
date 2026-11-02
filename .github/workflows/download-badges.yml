@@ -1,0 +1,45 @@
+# Publishes download counts for the README badges to the `badges` branch.
+# Shields.io can't filter the Open Shop Channel list down to one app, so
+# this job does the lookup and writes shields.io endpoint JSON instead.
+name: Download badges
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Count downloads and publish badge data
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          osc=$(curl -fsSL https://hbb1.oscwii.org/api/v4/contents \
+            | jq -e '[.[] | select(.slug == "WiiMedic")][0].downloads')
+          github=$(gh api "repos/$GITHUB_REPOSITORY/releases" --paginate \
+            | jq -s '[.[][].assets[].download_count] | add // 0')
+          total=$((osc + github))
+          echo "Homebrew Browser: $osc, GitHub: $github, total: $total"
+
+          fmt() { echo "$1" | sed ':a;s/\B[0-9]\{3\}\>/,&/;ta'; }
+          badge() {
+            jq -n --arg label "$1" --arg message "$(fmt "$2")" --arg color "$3" \
+              '{schemaVersion: 1, label: $label, message: $message, color: $color}'
+          }
+
+          mkdir -p "$RUNNER_TEMP/badges"
+          cd "$RUNNER_TEMP/badges"
+          badge "Homebrew Browser" "$osc" blue > homebrew-browser.json
+          badge "total downloads" "$total" brightgreen > total.json
+
+          git init -q -b badges
+          git add .
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898333+github-actions[bot]@users.noreply.github.com" \
+              commit -qm "Update download badges"
+          git push -qf "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" badges

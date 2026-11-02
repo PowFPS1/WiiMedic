@@ -1,6 +1,6 @@
-# Publishes download counts for the README badges to the `badges` branch.
-# Shields.io can't filter the Open Shop Channel list down to one app, so
-# this job does the lookup and writes shields.io endpoint JSON instead.
+# Publishes the Homebrew Browser download count for the README badge to the
+# `badges` branch. Shields.io can't filter the Open Shop Channel list down to
+# one app, so this job does the lookup and writes shields.io endpoint JSON.
 name: Download badges
 
 on:
@@ -21,10 +21,7 @@ jobs:
         run: |
           osc=$(curl -fsSL https://hbb1.oscwii.org/api/v4/contents \
             | jq -e '[.[] | select(.slug == "WiiMedic")][0].downloads')
-          github=$(gh api "repos/$GITHUB_REPOSITORY/releases" --paginate \
-            | jq -s '[.[][].assets[].download_count] | add // 0')
-          total=$((osc + github))
-          echo "Homebrew Browser: $osc, GitHub: $github, total: $total"
+          echo "Homebrew Browser: $osc"
 
           fmt() { echo "$1" | sed ':a;s/\B[0-9]\{3\}\>/,&/;ta'; }
           badge() {
@@ -35,7 +32,6 @@ jobs:
           mkdir -p "$RUNNER_TEMP/badges"
           cd "$RUNNER_TEMP/badges"
           badge "Homebrew Browser" "$osc" blue > homebrew-browser.json
-          badge "total downloads" "$total" brightgreen > total.json
 
           git init -q -b badges
           git add .

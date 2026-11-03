@@ -8,7 +8,6 @@
 ![Platform](https://img.shields.io/badge/platform-Wii%20%7C%20vWii-8a2be2)
 ![Homebrew Browser downloads](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FPowFPS1%2FWiiMedic%2Fbadges%2Fhomebrew-browser.json)
 ![GitHub downloads](https://img.shields.io/github/downloads/PowFPS1/WiiMedic/total?label=GitHub%20downloads)
-[![Tip on PayPal](https://img.shields.io/badge/tip-PayPal-00457C?logo=paypal)](https://paypal.me/PowFPS)
 
 </div>
 

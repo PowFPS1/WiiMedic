@@ -18,7 +18,7 @@
 
 I built this because I got tired of not knowing what was going on with my Wii. You get some weird behavior, you go to a forum, and everyone asks the same questions, what firmware are you on, do you have BootMii, what does your NAND look like, and you just don't know because nothing told you. I wanted something that would just lay it all out at once so you could either fix it yourself or at least walk into a conversation with actual useful information instead of just "my Wii is broken." 
 
-If you find the project useful, a star on the repo would mean a lot! And if it saved you some headache and you want to chip in, you can [tip me on PayPal](https://paypal.me/PowFPS). WiiMedic is staying free either way.
+If you find the project useful, a star on the repo would mean a lot!
 
 ---
 

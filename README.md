@@ -135,8 +135,6 @@ Works on all Wii models (RVL-001 and RVL-101) and Wii U vWii.
 
 Developed by **PowFPS1**
 
-**Abdelali221** helped with the WiFi card info and AP scanning.
-
 built with [devkitPro](https://devkitpro.org/) and [libogc](https://github.com/devkitPro/libogc). thanks to r/WiiHacks and GBAtemp for the feedback and testing.
 
 ---
